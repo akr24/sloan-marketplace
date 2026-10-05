@@ -5,8 +5,9 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 # Baked in at build time; Vite only reads VITE_* variables.
-ARG VITE_API_URL=http://localhost:8080
-ENV VITE_API_URL=$VITE_API_URL
+ARG VITE_API_URL=http://localhost:8081
+ARG VITE_BOT_NUMBER=
+ENV VITE_API_URL=$VITE_API_URL VITE_BOT_NUMBER=$VITE_BOT_NUMBER
 RUN npm run build
 
 # Runtime stage: static files served by nginx.

@@ -138,7 +138,8 @@ make bot FROM=16175550123 TEXT="sell Sloan Fall Ball | Nov 14 | 40 | 2"
    then subscribe to the `messages` field.
 4. Set `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET` (*App settings → Basic*),
    `WHATSAPP_PHONE_NUMBER_ID` and `WHATSAPP_ACCESS_TOKEN` in `.env`, and
-   `VITE_BOT_NUMBER` in `frontend/.env` so the Account page links to the bot.
+   `VITE_BOT_NUMBER` in `.env` (or `frontend/.env` for `make dev`) so the Account
+   page links to the bot.
 
 ## Email
 

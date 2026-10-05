@@ -1,4 +1,7 @@
 # Backend + frontend. Start with `make up` (which also brings up the database).
+#
+# Both compose files share the `sloan-marketplace` network so the backend can
+# reach the db container by its service name.
 name: sloan-marketplace
 
 include:
@@ -11,11 +14,12 @@ services:
     environment:
       PORT: "8080"
       APP_ENV: ${APP_ENV:-dev}
-      APP_URL: ${APP_URL:-http://localhost:5174}
+      APP_URL: http://localhost:${FRONTEND_PORT:-5174}
       DATABASE_URL: postgres://${POSTGRES_USER:-sloan}:${POSTGRES_PASSWORD:-sloan}@db:5432/${POSTGRES_DB:-sloan_marketplace}?sslmode=disable
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5174}
+      CORS_ORIGIN: http://localhost:${FRONTEND_PORT:-5174}
       # Dev-only default; set a real one in .env (at least 32 characters).
       JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-0123456789abcdef}
+      # Optional integrations; see .env.example. Empty means log-only.
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USERNAME: ${SMTP_USERNAME:-}
@@ -35,7 +39,8 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8081}
+        VITE_API_URL: http://localhost:${BACKEND_PORT:-8081}
+        VITE_BOT_NUMBER: ${VITE_BOT_NUMBER:-}
     container_name: sloan-marketplace-frontend
     ports:
       - "${FRONTEND_PORT:-5174}:80"
