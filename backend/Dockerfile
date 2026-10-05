@@ -1,5 +1,6 @@
-# Build stage: matches the Go toolchain installed locally (1.25).
-FROM golang:1.25-alpine AS build
+# Build stage: Go 1.26, which whatsmeow requires (a local 1.25 install
+# downloads the 1.26 toolchain automatically).
+FROM golang:1.26-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download

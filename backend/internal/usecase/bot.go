@@ -13,10 +13,14 @@ import (
 
 // Bot turns WhatsApp messages from sellers into listings. It is channel
 // agnostic: it takes the sender's number and message text and returns the
-// reply text; the WhatsApp adapter handles delivery.
+// reply text; the WhatsApp adapters handle delivery.
 //
 // The sender's WhatsApp number is how it finds the account, which is why
 // users.whatsapp_phone is unique. WhatsApp itself authenticates the sender.
+//
+// In a direct chat every message is a command ("sell ...", "mine"). In a
+// group the bot only answers messages starting with GroupPrefix, so normal
+// chatter is ignored, and its replies never reveal anyone's phone number.
 type Bot struct {
 	users    domain.UserRepository
 	listings *Listings
@@ -28,14 +32,65 @@ func NewBot(users domain.UserRepository, listings *Listings, appURL string) *Bot
 	return &Bot{users: users, listings: listings, appURL: strings.TrimRight(appURL, "/"), now: time.Now}
 }
 
-// Handle processes one inbound message and returns the reply.
+// GroupPrefix starts every bot command in a group chat; "/mp" is accepted
+// as a shorthand.
+const GroupPrefix = "/marketplace"
+
+// chat carries what differs between a direct chat and a group.
+type chat struct {
+	group bool
+	cmd   string // how users type a command here, e.g. `/marketplace sold 12`
+}
+
+var (
+	directChat = chat{cmd: ""}
+	groupChat  = chat{group: true, cmd: GroupPrefix + " "}
+)
+
+// Handle processes one direct-chat message and returns the reply.
 func (b *Bot) Handle(ctx context.Context, fromPhone, text string) (string, error) {
+	return b.handle(ctx, fromPhone, text, directChat)
+}
+
+// HandleGroup processes one group message. ok is false when the message
+// isn't addressed to the bot, and then nothing should be sent. fromPhone is
+// empty when WhatsApp hides the sender's number from the bot.
+func (b *Bot) HandleGroup(ctx context.Context, fromPhone, text string) (reply string, ok bool, err error) {
+	rest, ok := stripGroupPrefix(text)
+	if !ok {
+		return "", false, nil
+	}
+	if fromPhone == "" {
+		return "I can't see your number in this group yet. Send me a direct message once (just \"hi\"), then try again here.", true, nil
+	}
+	reply, err = b.handle(ctx, fromPhone, rest, groupChat)
+	return reply, true, err
+}
+
+func stripGroupPrefix(text string) (string, bool) {
+	text = strings.TrimSpace(text)
+	for _, p := range []string{GroupPrefix, "/mp"} {
+		if len(text) >= len(p) && strings.EqualFold(text[:len(p)], p) {
+			rest := text[len(p):]
+			if rest == "" || rest[0] == ' ' || rest[0] == '\n' {
+				return strings.TrimSpace(rest), true
+			}
+		}
+	}
+	return "", false
+}
+
+func (b *Bot) handle(ctx context.Context, fromPhone, text string, c chat) (string, error) {
 	phone, err := NormalisePhone(fromPhone)
 	if err != nil {
 		return "", err
 	}
 	user, err := b.users.FindByPhone(ctx, phone)
 	if errors.Is(err, domain.ErrNotFound) {
+		if c.group {
+			return fmt.Sprintf("Your WhatsApp number isn't linked to a Sloan Marketplace account yet. "+
+				"Sign up with your MIT email at %s using this WhatsApp number, then try again.", b.appURL), nil
+		}
 		return fmt.Sprintf("Hi! This number isn't linked to a Sloan Marketplace account yet. "+
 			"Sign up with your MIT email at %s and enter this WhatsApp number (+%s), then message me again.", b.appURL, phone), nil
 	}
@@ -47,33 +102,40 @@ func (b *Bot) Handle(ctx context.Context, fromPhone, text string) (string, error
 	cmd, rest := splitCommand(text)
 	switch cmd {
 	case "sell", "post":
-		return b.sell(ctx, user, rest)
+		return b.sell(ctx, user, rest, c)
 	case "mine", "my", "listings":
-		return b.mine(ctx, user)
+		return b.mine(ctx, user, c)
 	case "sold", "remove", "delete", "withdraw":
-		return b.close(ctx, user, cmd, rest)
+		return b.close(ctx, user, cmd, rest, c)
 	default:
-		return b.help(user), nil
+		return b.help(user, c), nil
 	}
 }
 
-func (b *Bot) sell(ctx context.Context, u *domain.User, body string) (string, error) {
+func (b *Bot) sell(ctx context.Context, u *domain.User, body string, c chat) (string, error) {
 	in, err := ParseSellMessage(body, b.now())
 	if err != nil {
-		return fmt.Sprintf("I couldn't read that listing: %v\n\n%s", err, sellExample), nil
+		return fmt.Sprintf("I couldn't read that listing: %v\n\n%s", err, sellExample(c)), nil
 	}
 	l, err := b.listings.Create(ctx, u.ID, domain.SourceWhatsApp, in)
 	if errors.Is(err, ErrInvalidInput) {
-		return fmt.Sprintf("I couldn't post that: %s\n\n%s", strings.TrimPrefix(err.Error(), ErrInvalidInput.Error()+": "), sellExample), nil
+		return fmt.Sprintf("I couldn't post that: %s\n\n%s", strings.TrimPrefix(err.Error(), ErrInvalidInput.Error()+": "), sellExample(c)), nil
 	}
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("Posted #%d: %d × %s on %s at %s each.\n%s/listings/%d\n\nReply \"sold %d\" when they're gone.",
-		l.ID, l.Quantity, l.EventName, l.EventDate.Format("Mon Jan 2"), formatPrice(l.PriceCents), b.appURL, l.ID, l.ID), nil
+	summary := fmt.Sprintf("%d × %s · %s · %s", l.Quantity, l.EventName, l.EventDate.Format("Mon Jan 2"), formatPrice(l.PriceCents))
+	if l.PriceCents > 0 {
+		summary += " each"
+	}
+	if c.group {
+		return fmt.Sprintf("✅ Listed #%d for %s: %s\n%s/listings/%d", l.ID, firstName(u.Name), summary, b.appURL, l.ID), nil
+	}
+	return fmt.Sprintf("Posted #%d: %s\n%s/listings/%d\n\nSend \"%ssold %d\" when they're gone.",
+		l.ID, summary, b.appURL, l.ID, c.cmd, l.ID), nil
 }
 
-func (b *Bot) mine(ctx context.Context, u *domain.User) (string, error) {
+func (b *Bot) mine(ctx context.Context, u *domain.User, c chat) (string, error) {
 	all, err := b.listings.Mine(ctx, u.ID)
 	if err != nil {
 		return "", err
@@ -85,15 +147,15 @@ func (b *Bot) mine(ctx context.Context, u *domain.User) (string, error) {
 		}
 	}
 	if len(lines) == 0 {
-		return "You have no active listings. Send \"sell\" to see how to post one.", nil
+		return fmt.Sprintf("You have no active listings. Send \"%shelp\" to see how to post one.", c.cmd), nil
 	}
-	return "Your active listings:\n" + strings.Join(lines, "\n") + "\n\nReply \"sold <number>\" to close one.", nil
+	return "Your active listings:\n" + strings.Join(lines, "\n") + fmt.Sprintf("\n\nSend \"%ssold <number>\" to close one.", c.cmd), nil
 }
 
-func (b *Bot) close(ctx context.Context, u *domain.User, cmd, rest string) (string, error) {
+func (b *Bot) close(ctx context.Context, u *domain.User, cmd, rest string, c chat) (string, error) {
 	id, err := strconv.ParseInt(strings.TrimPrefix(strings.TrimSpace(rest), "#"), 10, 64)
 	if err != nil {
-		return "Which listing? Reply e.g. \"sold 12\". Send \"mine\" to see your listing numbers.", nil
+		return fmt.Sprintf("Which listing? Send e.g. \"%ssold 12\". Send \"%smine\" to see your listing numbers.", c.cmd, c.cmd), nil
 	}
 	status := domain.StatusWithdrawn
 	if cmd == "sold" {
@@ -101,7 +163,7 @@ func (b *Bot) close(ctx context.Context, u *domain.User, cmd, rest string) (stri
 	}
 	l, err := b.listings.SetStatus(ctx, u.ID, id, status)
 	if errors.Is(err, domain.ErrNotFound) {
-		return fmt.Sprintf("You don't have a listing #%d. Send \"mine\" to see yours.", id), nil
+		return fmt.Sprintf("You don't have a listing #%d. Send \"%smine\" to see yours.", id, c.cmd), nil
 	}
 	if err != nil {
 		return "", err
@@ -109,27 +171,28 @@ func (b *Bot) close(ctx context.Context, u *domain.User, cmd, rest string) (stri
 	return fmt.Sprintf("Marked #%d (%s) as %s.", l.ID, l.EventName, status), nil
 }
 
-func (b *Bot) help(u *domain.User) string {
-	return fmt.Sprintf("Hi %s! I post ticket listings to Sloan Marketplace for you.\n\n%s\n\n"+
-		"Other commands:\n• mine: list your active listings\n• sold 12: mark listing #12 sold\n• remove 12: take it down\n\nBrowse: %s",
-		firstName(u.Name), sellExample, b.appURL)
+func (b *Bot) help(u *domain.User, c chat) string {
+	return fmt.Sprintf("Hi %s! I post ticket listings to Sloan Marketplace.\n\n%s\n\n"+
+		"Other commands:\n• %[3]smine: your active listings\n• %[3]ssold 12: mark #12 sold\n• %[3]sremove 12: take #12 down\n\nBrowse: %[4]s",
+		firstName(u.Name), sellExample(c), c.cmd, b.appURL)
 }
 
-const sellExample = `To post tickets, send:
-sell
-Event: Sloan Fall Ball
-Date: Nov 14
-Price: $40
-Qty: 2
-Venue: Boston Harbor Hotel (optional)
-Notes: anything else (optional)
+func sellExample(c chat) string {
+	post := "sell"
+	if c.group {
+		post = c.cmd + "post"
+	}
+	return fmt.Sprintf(`To list tickets, just write it out with a date and price:
+%[1]s Bruins tickets Sat 10/10 $80 each, 2 tickets
 
-Or in one line:
-sell Sloan Fall Ball | Nov 14 | $40 | 2`
+Or use fields:
+%[1]s Bruins vs Rangers | Oct 10 | $80 | 2 | TD Garden | notes`, post)
+}
 
 // ParseSellMessage reads a listing from the text after "sell". It accepts
-// "Key: value" lines (event, date, price, qty, venue, notes, any order) or a
-// single "event | date | price | qty | venue | notes" line.
+// "Key: value" lines (event, date, price, qty, venue, notes, any order), a
+// single "event | date | price | qty | venue | notes" line, or failing both,
+// free text like "Bruins tickets Sat $80" (see ParseFreeText).
 func ParseSellMessage(body string, now time.Time) (ListingInput, error) {
 	fields := map[string]string{}
 	body = strings.TrimSpace(body)
@@ -154,6 +217,9 @@ func ParseSellMessage(body string, now time.Time) (ListingInput, error) {
 			if key := fieldKey(k); key != "" {
 				fields[key] = strings.TrimSpace(v)
 			}
+		}
+		if len(fields) == 0 {
+			return ParseFreeText(body, now)
 		}
 	}
 
@@ -241,11 +307,23 @@ func ParseEventDate(s string, now time.Time) (time.Time, error) {
 
 	s = strings.NewReplacer(",", " ", ".", " ").Replace(s)
 	words := strings.Fields(s)
+	if len(words) == 1 || (len(words) == 2 && (words[0] == "this" || words[0] == "next")) {
+		if wd, ok := parseWeekday(words[len(words)-1]); ok {
+			days := (int(wd) - int(today.Weekday()) + 7) % 7
+			if words[0] == "next" && days == 0 {
+				days = 7
+			}
+			return today.AddDate(0, 0, days), nil
+		}
+	}
 	// Drop a leading weekday ("sat nov 14") and ordinal suffixes ("14th").
 	if len(words) > 1 && isWeekday(words[0]) {
 		words = words[1:]
 	}
 	for i, w := range words {
+		if w == "sept" {
+			words[i] = "sep"
+		}
 		for _, suf := range []string{"st", "nd", "rd", "th"} {
 			if n := strings.TrimSuffix(w, suf); n != w && n != "" && n[0] >= '0' && n[0] <= '9' {
 				words[i] = n
@@ -272,13 +350,19 @@ func ParseEventDate(s string, now time.Time) (time.Time, error) {
 }
 
 func isWeekday(w string) bool {
+	_, ok := parseWeekday(w)
+	return ok
+}
+
+// parseWeekday accepts full names and common abbreviations ("thu", "thurs").
+func parseWeekday(w string) (time.Weekday, bool) {
 	for d := time.Sunday; d <= time.Saturday; d++ {
 		name := strings.ToLower(d.String())
-		if w == name || w == name[:3] {
-			return true
+		if w == name || (len(w) >= 3 && strings.HasPrefix(name, w)) {
+			return d, true
 		}
 	}
-	return false
+	return 0, false
 }
 
 // titleMonth capitalises words so time.Parse matches "Jan" and "January".

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listings, type Listing, type ListingStatus } from '../api/client'
+import { groupShareLink } from '../api/format'
 import ListingCard from '../components/ListingCard'
 
 export default function MyListingsPage() {
@@ -45,6 +46,9 @@ export default function MyListingsPage() {
               <span className={`status ${l.status}`}>{l.status}</span>
               {l.status === 'active' ? (
                 <>
+                  <a className="share" href={groupShareLink(l, true)} target="_blank" rel="noreferrer">
+                    Share
+                  </a>
                   <button type="button" className="secondary" onClick={() => setStatus(l.id, 'sold')}>
                     Mark sold
                   </button>

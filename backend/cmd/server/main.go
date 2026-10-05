@@ -16,10 +16,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
+
 	"github.com/akr24/sloan-marketplace/backend/internal/adapter/email"
 	httpadapter "github.com/akr24/sloan-marketplace/backend/internal/adapter/http"
 	"github.com/akr24/sloan-marketplace/backend/internal/adapter/postgres"
 	"github.com/akr24/sloan-marketplace/backend/internal/adapter/whatsapp"
+	"github.com/akr24/sloan-marketplace/backend/internal/adapter/whatsappweb"
 	"github.com/akr24/sloan-marketplace/backend/internal/domain"
 	"github.com/akr24/sloan-marketplace/backend/internal/token"
 	"github.com/akr24/sloan-marketplace/backend/internal/usecase"
@@ -47,12 +51,19 @@ func main() {
 	users := postgres.NewUserRepository(pool)
 	listings := usecase.NewListings(postgres.NewListingRepository(pool))
 	appURL := envOr("APP_URL", "http://localhost:5174")
+	bot := usecase.NewBot(users, listings, appURL)
+
+	if os.Getenv("WHATSAPP_WEB_ENABLED") == "true" {
+		if l := startGroupBot(ctx, pool, bot); l != nil {
+			defer l.Close()
+		}
+	}
 
 	e := httpadapter.New(httpadapter.Deps{
 		DB:       pool,
 		Auth:     usecase.NewAuth(users, postgres.NewEmailCodeRepository(pool), mailer(), tokens, secret),
 		Listings: listings,
-		Bot:      usecase.NewBot(users, listings, appURL),
+		Bot:      bot,
 		Tokens:   tokens,
 		WhatsApp: httpadapter.WhatsAppConfig{
 			VerifyToken: os.Getenv("WHATSAPP_VERIFY_TOKEN"),
@@ -104,6 +115,27 @@ func whatsappSender() whatsapp.Sender {
 		return whatsapp.LogSender{}
 	}
 	return whatsapp.NewClient(id, tok)
+}
+
+// startGroupBot connects the unofficial WhatsApp Web bot that answers
+// "/marketplace" commands in group chats. Failures are logged, not fatal: the
+// website and Cloud API bot work without it.
+func startGroupBot(ctx context.Context, pool *pgxpool.Pool, bot *usecase.Bot) *whatsappweb.Listener {
+	client, err := whatsappweb.Open(ctx, stdlib.OpenDBFromPool(pool))
+	if err != nil {
+		log.Printf("whatsapp-web: %v", err)
+		return nil
+	}
+	if !whatsappweb.Linked(client) {
+		log.Print("whatsapp-web: no linked account yet; run `make wa-link`, then restart")
+		return nil
+	}
+	l, err := whatsappweb.Listen(client, bot)
+	if err != nil {
+		log.Print(err)
+		return nil
+	}
+	return l
 }
 
 func envOr(key, fallback string) string {

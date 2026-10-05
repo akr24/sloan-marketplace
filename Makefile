@@ -57,6 +57,9 @@ export JWT_SECRET   ?= dev-only-secret-change-me-0123456789abcdef
 export APP_ENV      ?= dev
 export APP_URL      ?= http://localhost:5174
 export PORT         ?= 8081
+# Load optional settings (SMTP, WhatsApp) from .env for native runs too.
+-include .env
+export
 
 .PHONY: backend
 backend: ## Run the Go API natively on :8081 (needs `make db-up`)
@@ -89,6 +92,10 @@ bot: ## Send TEXT to the bot as WhatsApp number FROM, without Meta (APP_ENV=dev)
 	@curl -s -X POST localhost:$(PORT)/api/dev/whatsapp \
 		-H 'Content-Type: application/json' \
 		-d "$$(jq -n --arg f "$$FROM" --arg t "$$TEXT" '{from:$$f,text:$$t}')" | jq -r .reply
+
+.PHONY: wa-link
+wa-link: ## Link the group bot's WhatsApp account (needs `make db-up`; set WHATSAPP_WEB_PHONE)
+	cd backend && go run ./cmd/walink
 
 .PHONY: help
 help: ## Show this help

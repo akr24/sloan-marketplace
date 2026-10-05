@@ -191,6 +191,25 @@ a.whatsapp {
   font-weight: 600;
 }
 
+a.button.secondary {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+a.share {
+  display: block;
+  text-align: center;
+  padding: 0.6rem 0;
+  font-weight: 600;
+  color: var(--whatsapp);
+  text-decoration: none;
+}
+
+.actions a.share {
+  display: inline;
+  padding: 0.5rem 0;
+}
+
 /* ---------- Text helpers ---------- */
 
 .muted {
@@ -211,6 +230,11 @@ a.whatsapp {
 }
 
 .notice {
+  color: var(--whatsapp);
+}
+
+.banner.success {
+  background: color-mix(in srgb, var(--whatsapp) 14%, transparent);
   color: var(--whatsapp);
 }
 

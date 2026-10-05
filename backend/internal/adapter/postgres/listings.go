@@ -143,4 +143,3 @@ func scanListings(rows pgx.Rows) ([]domain.Listing, error) {
 func escapeLike(s string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
-

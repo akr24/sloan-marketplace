@@ -47,3 +47,15 @@ export function todayISO(offsetDays = 0) {
 export function contactText(l: Listing) {
   return `Hi ${l.seller_name.split(' ')[0]}! I saw your Sloan Marketplace listing for ${l.event_name} (${formatDate(l.event_date)}). Are the tickets still available?`
 }
+
+// The post a seller drops into a Sloan WhatsApp group. wa.me/?text with no
+// number opens WhatsApp's chat picker, so the seller chooses the group.
+export function groupShareLink(l: Listing, mine: boolean) {
+  const lines = [
+    `🎟️ ${mine ? 'Selling' : 'Tickets for'}: ${l.event_name}`,
+    `${formatDate(l.event_date)}${l.venue ? ` · ${l.venue}` : ''}`,
+    `${l.quantity} ticket${l.quantity === 1 ? '' : 's'} · ${formatPrice(l.price_cents)}${l.price_cents > 0 ? ' each' : ''}`,
+    `${window.location.origin}/listings/${l.id}`,
+  ]
+  return `https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`
+}

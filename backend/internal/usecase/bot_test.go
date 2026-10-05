@@ -160,3 +160,43 @@ func TestSellerCannotCloseOthersListing(t *testing.T) {
 		t.Errorf("other seller closed listing: %s", reply)
 	}
 }
+
+func TestBotInGroup(t *testing.T) {
+	ctx := context.Background()
+	b, repo := newTestBot(t)
+
+	if _, ok, _ := b.HandleGroup(ctx, "16175550123", "who has bruins tix?"); ok {
+		t.Fatal("bot answered ordinary group chatter")
+	}
+
+	reply, ok, err := b.HandleGroup(ctx, "16175550123", "/marketplace post BRUINS TICKETS 80 DOLLARS fri")
+	if err != nil || !ok {
+		t.Fatal(ok, err)
+	}
+	if len(repo.rows) != 1 || !strings.Contains(reply, "Listed #1 for Tim") || !strings.Contains(reply, "/listings/1") {
+		t.Errorf("group post: %s", reply)
+	}
+
+	reply, _, _ = b.HandleGroup(ctx, "16175550123", "/marketplace mine")
+	if !strings.Contains(reply, `"/marketplace sold <number>"`) {
+		t.Errorf("group commands should use the prefix: %s", reply)
+	}
+
+	reply, _, _ = b.HandleGroup(ctx, "447911123456", "/mp post Gala fri $5")
+	if strings.Contains(reply, "447911123456") || !strings.Contains(reply, "isn't linked") {
+		t.Errorf("group reply must not reveal the number: %s", reply)
+	}
+
+	reply, _, _ = b.HandleGroup(ctx, "", "/marketplace post Gala fri $5")
+	if !strings.Contains(reply, "direct message") {
+		t.Errorf("hidden sender: %s", reply)
+	}
+}
+
+func TestBotDirectFreeText(t *testing.T) {
+	b, repo := newTestBot(t)
+	reply, _ := b.Handle(context.Background(), "16175550123", "sell BRUINS TICKETS 80 DOLLARS fri")
+	if len(repo.rows) != 1 || repo.rows[0].EventName != "Bruins Tickets" {
+		t.Errorf("free text DM: %s", reply)
+	}
+}

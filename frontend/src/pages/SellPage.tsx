@@ -27,7 +27,7 @@ export default function SellPage() {
         price: Number(price),
         notes,
       })
-      navigate(`/listings/${l.id}`)
+      navigate(`/listings/${l.id}?posted`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not post listing')
     } finally {

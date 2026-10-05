@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { listings, type Listing } from '../api/client'
-import { contactText, formatDate, formatPhone, formatPrice, whatsappLink } from '../api/format'
+import { contactText, formatDate, formatPhone, formatPrice, groupShareLink, whatsappLink } from '../api/format'
 import { useAuth } from '../auth/context'
 
 export default function ListingPage() {
   const { id } = useParams()
   const { user } = useAuth()
+  const justPosted = useSearchParams()[0].has('posted')
   const [listing, setListing] = useState<Listing | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -29,6 +30,9 @@ export default function ListingPage() {
         ‹ All tickets
       </Link>
       {l.status !== 'active' && <p className="banner">This listing is {l.status}.</p>}
+      {justPosted && isMine && (
+        <p className="banner success">Posted! Share it to your Sloan WhatsApp groups so people see it.</p>
+      )}
       <h1>{l.event_name}</h1>
       <p className="muted">
         {formatDate(l.event_date, { weekday: 'long', month: 'long', year: 'numeric' })}
@@ -56,9 +60,16 @@ export default function ListingPage() {
       </p>
 
       {isMine ? (
-        <Link to="/mine" className="button primary block">
-          Manage in My listings
-        </Link>
+        <>
+          {l.status === 'active' && (
+            <a className="whatsapp block" href={groupShareLink(l, true)} target="_blank" rel="noreferrer">
+              Share to a WhatsApp group
+            </a>
+          )}
+          <Link to="/mine" className="button secondary block">
+            Manage in My listings
+          </Link>
+        </>
       ) : (
         l.status === 'active' && (
           <a
@@ -71,6 +82,11 @@ export default function ListingPage() {
             <span className="small">{formatPhone(l.seller_whatsapp)}</span>
           </a>
         )
+      )}
+      {!isMine && l.status === 'active' && (
+        <a className="share" href={groupShareLink(l, false)} target="_blank" rel="noreferrer">
+          Share to a group
+        </a>
       )}
       <p className="muted small center">Payment and handoff happen between you and the seller.</p>
     </article>

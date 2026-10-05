@@ -10,11 +10,11 @@ Only people who can receive email at an `mit.edu` address can sign up.
 
 ## Stack
 
-- **Backend:** Go 1.25, Echo, pgx, clean architecture
+- **Backend:** Go 1.26, Echo, pgx, clean architecture
 - **Frontend:** React + TypeScript via Vite, phone-first CSS (installable as a home-screen web app)
 - **Database:** Postgres 18
 - **Email codes:** any free SMTP relay (Gmail app password, Brevo free tier); printed to the log in dev
-- **WhatsApp bot:** WhatsApp Business Cloud API (Meta, free test number)
+- **WhatsApp bot:** WhatsApp Business Cloud API (Meta, free test number) for direct chats; `whatsmeow` for the group-chat pilot
 - **Local infra:** Docker Compose, Makefile
 
 ## Quick start
@@ -99,9 +99,24 @@ carry sellers' phone numbers, so they're members-only.
 
 ## WhatsApp bot
 
-Sellers message the bot directly (WhatsApp's API can't read group chats).
-The sender's number identifies the account, which is why each account's
-WhatsApp number is unique. Commands:
+The sender's WhatsApp number identifies the account, which is why each
+account's WhatsApp number is unique. The bot runs over two connections:
+
+- **Direct chat** (official Cloud API): sellers message the bot's number.
+- **Group chat** (unofficial, pilot): the bot's number is added to a Sloan
+  group and answers messages starting with `/marketplace` (or `/mp`).
+  Everything else in the group is ignored.
+
+Listings can be written casually; the bot pulls out the date, price and
+quantity and treats the rest as the event name:
+
+```
+/marketplace post BRUINS TICKETS 80 DOLLARS fri
+/marketplace post 2 tix to the Sloan Gala 11/14 $40 each
+sell Bruins vs Rangers Sat 10/10 $80 each, 2 tickets
+```
+
+Fields also work, separated by pipes:
 
 ```
 sell Sloan Fall Ball | Nov 14 | $40 | 2 | Boston Harbor Hotel | notes
@@ -127,7 +142,27 @@ Try it locally without Meta (prices without `$` here, since make expands it):
 make bot FROM=16175550123 TEXT="sell Sloan Fall Ball | Nov 14 | 40 | 2"
 ```
 
-### Connecting a real WhatsApp number
+### Group bot pilot (unofficial)
+
+Meta's official API can only post to groups the business creates, capped at
+8 members, so the group bot links to an ordinary WhatsApp account the way
+WhatsApp Web does (via the `whatsmeow` library). This is against WhatsApp's
+terms of service and the number can be banned, so use a dedicated SIM and
+keep the Cloud API bot as the fallback.
+
+1. Put the bot's number in `.env` as `WHATSAPP_WEB_PHONE` and run
+   `make db-up && make wa-link`. It prints an 8-character code.
+2. On the bot's phone: WhatsApp → Settings → Linked devices → Link a device →
+   "Link with phone number instead", and enter the code within two minutes.
+3. Set `WHATSAPP_WEB_ENABLED=true` and restart the backend. The session is
+   stored in Postgres (`whatsmeow_*` tables), so only one backend may run it.
+4. Have a group admin add the number to the group.
+
+WhatsApp is rolling out hidden phone numbers in groups. When the bot can't
+see a member's number it asks them to send it one direct message, after
+which it recognises them in groups too.
+
+### Connecting a real WhatsApp number (Cloud API)
 
 1. Create an app at developers.facebook.com, add the WhatsApp product, and
    note the test **phone number ID** and a **temporary access token** from
