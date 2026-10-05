@@ -1,0 +1,26 @@
+# Postgres only. Start with `make db-up`.
+#
+# Kept separate from the app compose file so the database can keep running
+# while the backend and frontend are rebuilt or run outside Docker.
+services:
+  db:
+    image: postgres:18-alpine
+    container_name: sloan-marketplace-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sloan}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sloan}
+      POSTGRES_DB: ${POSTGRES_DB:-sloan_marketplace}
+    ports:
+      # 5434 on the host: 5432 and 5433 are taken by other local projects.
+      - "${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - sloan-marketplace-pgdata:/var/lib/postgresql
+      - ./db/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sloan} -d ${POSTGRES_DB:-sloan_marketplace}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  sloan-marketplace-pgdata:

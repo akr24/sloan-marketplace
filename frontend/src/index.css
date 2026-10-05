@@ -1,0 +1,90 @@
+/* Phone-first base. Sizes are tuned for a 375px-wide screen and scale up;
+   inputs stay at 16px so iOS Safari doesn't zoom on focus. */
+:root {
+  --text: #1d1b20;
+  --muted: #6b6772;
+  --bg: #f6f5f3;
+  --surface: #ffffff;
+  --border: #e4e2df;
+  --accent: #a31f34; /* MIT cardinal red */
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(163, 31, 52, 0.08);
+  --whatsapp: #1f9d55;
+  --error: #b3261e;
+  --radius: 14px;
+  --tabbar-h: 64px;
+
+  font: 16px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  color-scheme: light dark;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #ecebee;
+    --muted: #a19ca8;
+    --bg: #121114;
+    --surface: #1d1b20;
+    --border: #312e36;
+    --accent: #e0566b;
+    --accent-ink: #1a0a0d;
+    --accent-soft: rgba(224, 86, 107, 0.14);
+    --whatsapp: #3ccf7a;
+    --error: #f2b8b5;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  min-height: 100svh;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+  margin: 0 0 0.5rem;
+}
+
+h1 {
+  font-size: 1.6rem;
+}
+
+h2 {
+  font-size: 1.35rem;
+  margin: 0.5rem 0 1rem;
+}
+
+h3 {
+  font-size: 1.05rem;
+}
+
+p {
+  margin: 0 0 0.5rem;
+}
+
+a {
+  color: var(--accent);
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+code,
+pre {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}

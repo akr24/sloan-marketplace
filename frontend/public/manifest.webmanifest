@@ -1,0 +1,9 @@
+{
+  "name": "Sloan Marketplace",
+  "short_name": "Sloan Market",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#a31f34",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
