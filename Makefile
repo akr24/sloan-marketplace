@@ -37,6 +37,15 @@ db-reset: ## Stop Postgres and delete its data volume (re-runs migrations next s
 psql: ## Open a psql shell in the Postgres container
 	$(COMPOSE_DB) exec db psql -U sloan -d sloan_marketplace
 
+.PHONY: users
+users: ## List accounts
+	@$(COMPOSE_DB) exec db psql -U sloan -d sloan_marketplace -c "SELECT id, email, name, whatsapp_phone, created_at FROM users ORDER BY id"
+
+.PHONY: delete-user
+delete-user: ## Delete the account with EMAIL=... and all its listings
+	@test -n "$(EMAIL)" || { echo "usage: make delete-user EMAIL=you@mit.edu"; exit 1; }
+	@$(COMPOSE_DB) exec db psql -U sloan -d sloan_marketplace -c "DELETE FROM users WHERE email = lower('$(EMAIL)')" | sed 's/^DELETE 0$$/No account with that email./; s/^DELETE 1$$/Deleted. You can sign up again with the same email and number./'
+
 .PHONY: build
 build: ## Build backend and frontend images
 	$(COMPOSE) build
