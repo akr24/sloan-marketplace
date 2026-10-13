@@ -27,6 +27,7 @@ open http://localhost:5174
 For faster iteration, run the database in Docker and the apps natively:
 
 ```sh
+make env       # creates .env from .env.example
 make install   # once
 make dev       # Postgres in Docker, Go + Vite with hot reload
 ```

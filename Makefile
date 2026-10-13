@@ -14,8 +14,15 @@ COMPOSE_DB := docker compose -f docker-compose.db.yml
 
 ## ---------- Docker ----------
 
+.PHONY: env
+env: .env ## Create .env from .env.example if it doesn't exist
+	@:
+
+.env: .env.example
+	@test -f .env || { cp .env.example .env && echo "Created .env from .env.example; edit it to add SMTP or WhatsApp settings."; }
+
 .PHONY: db-up
-db-up: ## Start Postgres in Docker
+db-up: .env ## Start Postgres in Docker
 	$(COMPOSE_DB) up -d --wait
 
 .PHONY: db-down
@@ -35,7 +42,7 @@ build: ## Build backend and frontend images
 	$(COMPOSE) build
 
 .PHONY: up
-up: ## Build and start db + backend + frontend
+up: .env ## Build and start db + backend + frontend
 	$(COMPOSE) up -d --build --wait
 
 .PHONY: down
@@ -94,7 +101,7 @@ bot: ## Send TEXT to the bot as WhatsApp number FROM, without Meta (APP_ENV=dev)
 		-d "$$(jq -n --arg f "$$FROM" --arg t "$$TEXT" '{from:$$f,text:$$t}')" | jq -r .reply
 
 .PHONY: wa-link
-wa-link: ## Link the group bot's WhatsApp account (needs `make db-up`; set WHATSAPP_WEB_PHONE)
+wa-link: db-up ## Link the group bot's WhatsApp account (WHATSAPP_WEB_PHONE from .env)
 	cd backend && go run ./cmd/walink
 
 .PHONY: help
