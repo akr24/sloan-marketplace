@@ -37,6 +37,11 @@ db-reset: ## Stop Postgres and delete its data volume (re-runs migrations next s
 psql: ## Open a psql shell in the Postgres container
 	$(COMPOSE_DB) exec db psql -U sloan -d sloan_marketplace
 
+.PHONY: migrate
+migrate: ## Apply db/migrations to DATABASE_URL (for a hosted database; local Docker applies them itself)
+	@for f in db/migrations/*.sql; do echo "== $$f"; psql "$$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$$f" || exit 1; done
+	@echo "Migrations applied. (The WhatsApp session tables are created by the backend on start-up.)"
+
 .PHONY: users
 users: ## List accounts
 	@$(COMPOSE_DB) exec db psql -U sloan -d sloan_marketplace -c "SELECT id, email, name, whatsapp_phone, created_at FROM users ORDER BY id"

@@ -183,6 +183,41 @@ Set `SMTP_*` in `.env` (see `.env.example`). The simplest free option is a
 Gmail account with 2-step verification and an app password
 (`smtp.gmail.com:587`). Brevo's free plan (300 emails/day) also works.
 
+## Deploying
+
+Frontend on Vercel, backend and Postgres on Railway (about $5/month), both
+deploying on every push to `main`.
+
+**Railway (backend + database)**
+
+1. New project → Deploy from GitHub repo → this repo. In the service settings
+   set **Root Directory** to `backend`; `backend/railway.json` does the rest
+   (Dockerfile build, one replica, `/healthz` health check).
+2. Add a **Postgres** service to the project. On the backend service add a
+   variable `DATABASE_URL` = `${{Postgres.DATABASE_URL}}`.
+3. Apply the schema once from your machine, using the public connection
+   string from the Postgres service's *Connect* tab:
+   `DATABASE_URL='postgres://…' make migrate`
+4. Set the remaining variables on the backend service: `APP_ENV=prod`,
+   `JWT_SECRET` (`openssl rand -base64 48`), `APP_URL` and `CORS_ORIGIN`
+   (your Vercel URL, no trailing slash), the `SMTP_*` values, and
+   `WHATSAPP_WEB_ENABLED=true` if the group bot should run there.
+5. Generate a public domain under *Settings → Networking*. That's the API URL.
+
+To move the WhatsApp link to the hosted database, run
+`DATABASE_URL='postgres://…' make wa-link` against it once (unlink the
+local one first on the phone), and keep the local backend's
+`WHATSAPP_WEB_ENABLED=false` so the two don't fight over the session.
+
+**Vercel (frontend)**
+
+1. New project → import this repo, **Root Directory** `frontend`. Vercel
+   detects Vite; `frontend/vercel.json` adds the SPA rewrite.
+2. Environment variables: `VITE_API_URL` = the Railway API URL, and
+   `VITE_BOT_NUMBER` = the bot's number in digits.
+3. Deploy, then put the resulting URL into Railway's `APP_URL` and
+   `CORS_ORIGIN` and redeploy the backend.
+
 ## Ports
 
 | Service  | Port |
