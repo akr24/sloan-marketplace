@@ -42,6 +42,16 @@ migrate: ## Apply db/migrations to DATABASE_URL (for a hosted database; local Do
 	@for f in db/migrations/*.sql; do echo "== $$f"; psql "$$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$$f" || exit 1; done
 	@echo "Migrations applied. (The WhatsApp session tables are created by the backend on start-up.)"
 
+.PHONY: railway-env
+railway-env: .env ## Print the backend variables for Railway's Raw Editor (SMTP from .env, fresh JWT_SECRET)
+	@echo 'DATABASE_URL=$${{Postgres.DATABASE_URL}}'
+	@echo 'APP_ENV=prod'
+	@echo "JWT_SECRET=$$(openssl rand -base64 48 | tr -d '\n')"
+	@echo 'APP_URL=https://CHANGE-ME.vercel.app'
+	@echo 'CORS_ORIGIN=https://CHANGE-ME.vercel.app'
+	@grep -E '^SMTP_' .env
+	@echo 'WHATSAPP_WEB_ENABLED=false'
+
 .PHONY: users
 users: ## List accounts
 	@$(COMPOSE_DB) exec db psql -U sloan -d sloan_marketplace -c "SELECT id, email, name, whatsapp_phone, created_at FROM users ORDER BY id"
