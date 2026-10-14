@@ -40,6 +40,11 @@ func (m *SMTPMailer) SendCode(ctx context.Context, to, code string) error {
 		body,
 	}, "\r\n")
 
+	// Hosts that block outbound SMTP (Railway's trial plan does) drop the
+	// connection silently, so bound the attempt rather than hang the request.
+	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
+	defer cancel()
+
 	auth := smtp.PlainAuth("", m.Username, m.Password, m.Host)
 	errc := make(chan error, 1)
 	go func() {
@@ -52,9 +57,11 @@ func (m *SMTPMailer) SendCode(ctx context.Context, to, code string) error {
 		}
 		return nil
 	case <-ctx.Done():
-		return ctx.Err()
+		return fmt.Errorf("email: send to %s: timed out after %s (is outbound SMTP blocked?)", to, sendTimeout)
 	}
 }
+
+const sendTimeout = 15 * time.Second
 
 // envelopeAddress pulls "a@b" out of "Name <a@b>".
 func envelopeAddress(from string) string {
