@@ -5,7 +5,7 @@
 #   make down       stop everything (data volume is kept)
 #   make dev        run backend and frontend natively against the Docker db
 #   make help       list every target
-
+#
 SHELL := /bin/bash
 COMPOSE    := docker compose
 COMPOSE_DB := docker compose -f docker-compose.db.yml
