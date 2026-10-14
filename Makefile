@@ -50,7 +50,7 @@ railway-env: .env ## Print the backend variables for Railway's Raw Editor (SMTP 
 	@echo "JWT_SECRET=$$(openssl rand -base64 48 | tr -d '\n')"
 	@echo 'APP_URL=https://CHANGE-ME.vercel.app'
 	@echo 'CORS_ORIGIN=https://CHANGE-ME.vercel.app'
-	@grep -E '^SMTP_' .env
+	@grep -E '^(BREVO_API_KEY|SMTP_)' .env
 	@echo 'WHATSAPP_WEB_ENABLED=false'
 
 .PHONY: users

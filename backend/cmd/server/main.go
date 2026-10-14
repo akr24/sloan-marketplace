@@ -94,11 +94,15 @@ func main() {
 	}
 }
 
-// mailer sends real email when SMTP is configured and logs codes otherwise.
+// mailer picks Brevo's HTTP API if a key is set, else SMTP if a host is
+// set, else logs the codes.
 func mailer() domain.Mailer {
+	if key := os.Getenv("BREVO_API_KEY"); key != "" {
+		return &email.BrevoMailer{APIKey: key, From: envOr("SMTP_FROM", os.Getenv("SMTP_USERNAME"))}
+	}
 	host := os.Getenv("SMTP_HOST")
 	if host == "" {
-		log.Print("email: SMTP_HOST not set, sign-in codes will be printed to this log")
+		log.Print("email: neither BREVO_API_KEY nor SMTP_HOST set, sign-in codes will be printed to this log")
 		return email.LogMailer{}
 	}
 	return &email.SMTPMailer{

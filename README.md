@@ -13,7 +13,7 @@ Only people who can receive email at an `mit.edu` address can sign up.
 - **Backend:** Go 1.26, Echo, pgx, clean architecture
 - **Frontend:** React + TypeScript via Vite, phone-first CSS (installable as a home-screen web app)
 - **Database:** Postgres 18
-- **Email codes:** any free SMTP relay (Gmail app password, Brevo free tier); printed to the log in dev
+- **Email codes:** Brevo HTTP API or any SMTP relay, both free tiers; printed to the log in dev
 - **WhatsApp bot:** WhatsApp Business Cloud API (Meta, free test number) for direct chats; `whatsmeow` for the group-chat pilot
 - **Local infra:** Docker Compose, Makefile
 
@@ -181,9 +181,14 @@ which it recognises them in groups too.
 
 ## Email
 
-Set `SMTP_*` in `.env` (see `.env.example`). The simplest free option is a
-Gmail account with 2-step verification and an app password
-(`smtp.gmail.com:587`). Brevo's free plan (300 emails/day) also works.
+Two options, both free; set one in `.env` (see `.env.example`):
+
+- **Brevo HTTP API** (recommended, and required on Railway, which blocks
+  outbound SMTP on its Trial and Hobby plans): sign up at brevo.com, verify
+  the sending address under *Senders*, create an API key under *SMTP & API*,
+  and set `BREVO_API_KEY` plus `SMTP_FROM` to that verified address.
+- **SMTP**: `SMTP_*` pointing at a Gmail account with an app password
+  (`smtp.gmail.com:587`) or any other relay.
 
 ## Deploying
 
