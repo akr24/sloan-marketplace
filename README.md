@@ -52,7 +52,7 @@ backend/
     whatsapp/            Cloud API client for bot replies
   internal/token/        JWT session and signup tokens
 frontend/                Vite React app
-db/migrations/           SQL, applied on first database start
+  db/migrations/         SQL schema, embedded and applied on start-up
 docker-compose.db.yml    Postgres only
 docker-compose.yml       backend + frontend (includes the db file)
 ```
@@ -60,8 +60,10 @@ docker-compose.yml       backend + frontend (includes the db file)
 Dependencies point inward: adapters import use cases and domain, use cases
 import domain, domain imports nothing from the project.
 
-Migrations run only when the Postgres volume is first created. After adding
-one, `make db-reset` drops the volume so it is applied on the next `make up`.
+The backend applies `backend/db/migrations/*.sql` every time it starts,
+under an advisory lock, so a fresh database gets its schema with no manual
+step. Each file must be idempotent (`CREATE TABLE IF NOT EXISTS`, ...);
+to change existing tables, add a new numbered file rather than editing one.
 
 ## Sign-up and sign-in
 
@@ -195,14 +197,11 @@ deploying on every push to `main`.
    (Dockerfile build, one replica, `/healthz` health check).
 2. Add a **Postgres** service to the project. On the backend service add a
    variable `DATABASE_URL` = `${{Postgres.DATABASE_URL}}`.
-3. Apply the schema once from your machine, using the public connection
-   string from the Postgres service's *Connect* tab:
-   `DATABASE_URL='postgres://…' make migrate`
-4. Set the remaining variables on the backend service: `APP_ENV=prod`,
+3. Set the remaining variables on the backend service: `APP_ENV=prod`,
    `JWT_SECRET` (`openssl rand -base64 48`), `APP_URL` and `CORS_ORIGIN`
    (your Vercel URL, no trailing slash), the `SMTP_*` values, and
    `WHATSAPP_WEB_ENABLED=true` if the group bot should run there.
-5. Generate a public domain under *Settings → Networking*. That's the API URL.
+4. Generate a public domain under *Settings → Networking*. That's the API URL.
 
 To move the WhatsApp link to the hosted database, run
 `DATABASE_URL='postgres://…' make wa-link` against it once (unlink the

@@ -30,7 +30,7 @@ db-down: ## Stop Postgres (keeps data)
 	$(COMPOSE_DB) down
 
 .PHONY: db-reset
-db-reset: ## Stop Postgres and delete its data volume (re-runs migrations next start)
+db-reset: ## Stop Postgres and delete its data volume (the backend recreates the schema next start)
 	$(COMPOSE_DB) down -v
 
 .PHONY: psql
@@ -38,9 +38,9 @@ psql: ## Open a psql shell in the Postgres container
 	$(COMPOSE_DB) exec db psql -U sloan -d sloan_marketplace
 
 .PHONY: migrate
-migrate: ## Apply db/migrations to DATABASE_URL (for a hosted database; local Docker applies them itself)
-	@for f in db/migrations/*.sql; do echo "== $$f"; psql "$$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$$f" || exit 1; done
-	@echo "Migrations applied. (The WhatsApp session tables are created by the backend on start-up.)"
+migrate: ## Apply backend/db/migrations to DATABASE_URL by hand (the backend also does this on start-up)
+	@for f in backend/db/migrations/*.sql; do echo "== $$f"; psql "$$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$$f" || exit 1; done
+	@echo "Migrations applied."
 
 .PHONY: railway-env
 railway-env: .env ## Print the backend variables for Railway's Raw Editor (SMTP from .env, fresh JWT_SECRET)

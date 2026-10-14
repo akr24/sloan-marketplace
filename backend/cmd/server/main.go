@@ -19,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 
+	"github.com/akr24/sloan-marketplace/backend/db"
 	"github.com/akr24/sloan-marketplace/backend/internal/adapter/email"
 	httpadapter "github.com/akr24/sloan-marketplace/backend/internal/adapter/http"
 	"github.com/akr24/sloan-marketplace/backend/internal/adapter/postgres"
@@ -41,6 +42,9 @@ func main() {
 		log.Fatalf("database: %v", err)
 	}
 	defer pool.Close()
+	if err := postgres.Migrate(ctx, pool, db.Migrations); err != nil {
+		log.Fatalf("migrate: %v", err)
+	}
 
 	secret := os.Getenv("JWT_SECRET")
 	tokens, err := token.New(secret, 30*24*time.Hour, 30*time.Minute)
