@@ -38,6 +38,30 @@ listens on your LAN too, so you can open `http://<your-mac-ip>:5174` on a phone.
 
 `make help` lists every target.
 
+## Setting up on a new machine
+
+Needs Docker Desktop, Go 1.25+ (it fetches 1.26 itself) and Node 20+.
+
+```sh
+git clone git@github.com:akr24/sloan-marketplace.git
+cd sloan-marketplace
+make env       # creates .env from .env.example
+make install   # Go modules and npm packages
+make dev       # Postgres in Docker, backend on :8081, frontend on :5174
+```
+
+Open http://localhost:5174. Sign-in codes print in the terminal running
+`make dev` until you add email settings to `.env` (see **Email**). Your
+database is your own: accounts and listings are separate from production.
+
+To run the WhatsApp bot locally too, the bot phone (+1 872 266 7930) has
+to approve your machine once: run `make wa-link`, read out the 8-character
+code to whoever holds that phone, and they enter it under Linked devices →
+"Link with phone number instead". Then set `WHATSAPP_WEB_ENABLED=true` in
+`.env` and restart. WhatsApp allows four linked devices, but every machine
+with the bot enabled answers every message, so keep it enabled on one
+machine at a time.
+
 ## Layout
 
 ```
