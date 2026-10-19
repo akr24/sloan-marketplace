@@ -94,6 +94,9 @@ type BrevoMailer struct {
 
 func (m *BrevoMailer) SendCode(ctx context.Context, to, code string) error {
 	name, addr := splitAddress(m.From)
+	if name == "" {
+		name = "Sloan Marketplace" // Brevo requires a sender name
+	}
 	payload, _ := json.Marshal(map[string]any{
 		"sender":      map[string]string{"name": name, "email": addr},
 		"to":          []map[string]string{{"email": to}},
