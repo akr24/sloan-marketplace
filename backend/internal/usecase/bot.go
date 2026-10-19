@@ -107,6 +107,8 @@ func (b *Bot) handle(ctx context.Context, fromPhone, text string, c chat) (strin
 		return b.mine(ctx, user, c)
 	case "sold", "remove", "delete", "withdraw":
 		return b.close(ctx, user, cmd, rest, c)
+	case "edit", "update", "change":
+		return b.edit(ctx, user, rest, c)
 	default:
 		return b.help(user, c), nil
 	}
@@ -171,9 +173,84 @@ func (b *Bot) close(ctx context.Context, u *domain.User, cmd, rest string, c cha
 	return fmt.Sprintf("Marked #%d (%s) as %s.", l.ID, l.EventName, status), nil
 }
 
+// edit changes one field of a listing: "edit 12 price $50", "edit 12 qty 3",
+// "edit 12 date Nov 20", "edit 12 venue TD Garden", "edit 12 notes ...",
+// "edit 12 event Bruins vs Rangers".
+func (b *Bot) edit(ctx context.Context, u *domain.User, rest string, c chat) (string, error) {
+	usage := fmt.Sprintf("To change a listing, send \"%sedit <number> <field> <new value>\", e.g.\n"+
+		"%[1]sedit 12 price $50\n%[1]sedit 12 qty 3\n%[1]sedit 12 date Nov 20\n"+
+		"Fields: event, date, price, qty, venue, notes. Send \"%[1]smine\" for your listing numbers.", c.cmd)
+
+	fields := strings.Fields(rest)
+	if len(fields) < 3 {
+		return usage, nil
+	}
+	id, err := strconv.ParseInt(strings.TrimPrefix(fields[0], "#"), 10, 64)
+	if err != nil {
+		return usage, nil
+	}
+	field := fieldKey(fields[1])
+	value := strings.TrimSpace(rest[strings.Index(rest, fields[1])+len(fields[1]):])
+	if field == "" {
+		return fmt.Sprintf("I don't know the field %q.\n\n%s", fields[1], usage), nil
+	}
+
+	l, err := b.listings.Get(ctx, id)
+	if err == nil && l.SellerID != u.ID {
+		err = domain.ErrNotFound
+	}
+	if errors.Is(err, domain.ErrNotFound) {
+		return fmt.Sprintf("You don't have a listing #%d. Send \"%smine\" to see yours.", id, c.cmd), nil
+	}
+	if err != nil {
+		return "", err
+	}
+
+	in := InputOf(l)
+	switch field {
+	case "event":
+		in.EventName = value
+	case "venue":
+		in.Venue = value
+	case "notes":
+		in.Notes = value
+	case "date":
+		d, err := ParseEventDate(value, b.now())
+		if err != nil {
+			return fmt.Sprintf("I couldn't read that: %v", err), nil
+		}
+		in.EventDate = d
+	case "price":
+		p, err := ParsePriceCents(value)
+		if err != nil {
+			return fmt.Sprintf("I couldn't read that: %v", err), nil
+		}
+		in.PriceCents = p
+	case "qty":
+		n, err := strconv.Atoi(strings.Fields(value)[0])
+		if err != nil {
+			return fmt.Sprintf("Quantity %q isn't a number.", value), nil
+		}
+		in.Quantity = n
+	}
+
+	l, err = b.listings.Update(ctx, u.ID, id, in)
+	if errors.Is(err, ErrInvalidInput) {
+		return "I couldn't change that: " + strings.TrimPrefix(err.Error(), ErrInvalidInput.Error()+": "), nil
+	}
+	if err != nil {
+		return "", err
+	}
+	summary := fmt.Sprintf("%d × %s · %s · %s", l.Quantity, l.EventName, l.EventDate.Format("Mon Jan 2"), formatPrice(l.PriceCents))
+	if l.Venue != "" {
+		summary += " · " + l.Venue
+	}
+	return fmt.Sprintf("Updated #%d: %s", l.ID, summary), nil
+}
+
 func (b *Bot) help(u *domain.User, c chat) string {
 	return fmt.Sprintf("Hi %s! I post ticket listings to Sloan Marketplace.\n\n%s\n\n"+
-		"Other commands:\n• %[3]smine: your active listings\n• %[3]ssold 12: mark #12 sold\n• %[3]sremove 12: take #12 down\n\nBrowse: %[4]s",
+		"Other commands:\n• %[3]smine: your active listings\n• %[3]sedit 12 price $50: change a field (event, date, price, qty, venue, notes)\n• %[3]ssold 12: mark #12 sold\n• %[3]sremove 12: take #12 down\n\nBrowse: %[4]s",
 		firstName(u.Name), sellExample(c), c.cmd, b.appURL)
 }
 

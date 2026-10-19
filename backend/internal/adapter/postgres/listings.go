@@ -110,6 +110,21 @@ func (r *ListingRepository) Search(ctx context.Context, f domain.ListingFilter) 
 	return scanListings(rows)
 }
 
+func (r *ListingRepository) Update(ctx context.Context, l *domain.Listing) error {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE listings
+		SET event_name = $2, event_date = $3, venue = $4, quantity = $5, price_cents = $6, notes = $7, updated_at = now()
+		WHERE id = $1`,
+		l.ID, l.EventName, l.EventDate, l.Venue, l.Quantity, l.PriceCents, l.Notes)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
 func (r *ListingRepository) SetStatus(ctx context.Context, id int64, s domain.Status) error {
 	tag, err := r.pool.Exec(ctx, `UPDATE listings SET status = $2, updated_at = now() WHERE id = $1`, id, s)
 	if err != nil {

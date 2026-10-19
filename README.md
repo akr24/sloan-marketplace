@@ -95,6 +95,7 @@ carry sellers' phone numbers, so they're members-only.
 | POST   | `/api/listings`              | `{"event_name", "event_date", "venue", "quantity", "price", "notes"}`, price in dollars per ticket |
 | GET    | `/api/listings/mine`         | the caller's listings, any status |
 | GET    | `/api/listings/:id`          | |
+| PUT    | `/api/listings/:id`          | same body as POST; own listings only |
 | PATCH  | `/api/listings/:id/status`   | `{"status": "active" \| "sold" \| "withdrawn"}`, own listings only |
 | GET    | `/webhooks/whatsapp`         | Meta subscription handshake |
 | POST   | `/webhooks/whatsapp`         | inbound WhatsApp messages |
@@ -135,8 +136,9 @@ Price: $40
 Qty: 2
 ```
 
-`mine` lists your active listings, `sold 12` marks #12 sold, `remove 12`
-withdraws it, anything else replies with help. Dates accept `Nov 14`,
+`mine` lists your active listings, `edit 12 price $50` changes one field
+(event, date, price, qty, venue or notes), `sold 12` marks #12 sold,
+`remove 12` withdraws it, and anything else replies with help. Dates accept `Nov 14`,
 `11/14`, `2026-11-14`, `Sat Nov 14th`, `tomorrow` and similar.
 
 Try it locally without Meta (prices without `$` here, since make expands it):

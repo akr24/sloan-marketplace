@@ -4,6 +4,7 @@ import { AuthProvider } from './auth/AuthContext'
 import { useAuth } from './auth/context'
 import AccountPage from './pages/AccountPage'
 import BrowsePage from './pages/BrowsePage'
+import EditListingPage from './pages/EditListingPage'
 import ListingPage from './pages/ListingPage'
 import MyListingsPage from './pages/MyListingsPage'
 import SellPage from './pages/SellPage'
@@ -65,6 +66,7 @@ export default function App() {
           />
           <Route path="/" element={<RequireAuth><BrowsePage /></RequireAuth>} />
           <Route path="/listings/:id" element={<RequireAuth><ListingPage /></RequireAuth>} />
+          <Route path="/listings/:id/edit" element={<RequireAuth><EditListingPage /></RequireAuth>} />
           <Route path="/sell" element={<RequireAuth><SellPage /></RequireAuth>} />
           <Route path="/mine" element={<RequireAuth><MyListingsPage /></RequireAuth>} />
           <Route path="/account" element={<RequireAuth><AccountPage /></RequireAuth>} />

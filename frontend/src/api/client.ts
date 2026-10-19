@@ -111,6 +111,8 @@ export const listings = {
   get: (id: number) => api<Listing>(`/api/listings/${id}`),
   mine: () => api<Listing[]>('/api/listings/mine'),
   create: (body: NewListing) => api<Listing>('/api/listings', post(body)),
+  update: (id: number, body: NewListing) =>
+    api<Listing>(`/api/listings/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   setStatus: (id: number, status: ListingStatus) =>
     api<Listing>(`/api/listings/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
 }

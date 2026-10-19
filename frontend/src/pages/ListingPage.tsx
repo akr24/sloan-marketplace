@@ -66,7 +66,10 @@ export default function ListingPage() {
               Share to a WhatsApp group
             </a>
           )}
-          <Link to="/mine" className="button secondary block">
+          <Link to={`/listings/${l.id}/edit`} className="button secondary block">
+            Edit listing
+          </Link>
+          <Link to="/mine" className="share">
             Manage in My listings
           </Link>
         </>

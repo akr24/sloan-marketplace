@@ -91,6 +91,7 @@ func New(d Deps) *echo.Echo {
 	listings.POST("", l.create)
 	listings.GET("/mine", l.mine)
 	listings.GET("/:id", l.get)
+	listings.PUT("/:id", l.update)
 	listings.PATCH("/:id/status", l.setStatus)
 
 	wa := whatsappHandler{bot: d.Bot, cfg: d.WhatsApp, seen: newRecentIDs(1000)}

@@ -200,3 +200,38 @@ func TestBotDirectFreeText(t *testing.T) {
 		t.Errorf("free text DM: %s", reply)
 	}
 }
+
+func TestBotEdit(t *testing.T) {
+	ctx := context.Background()
+	b, repo := newTestBot(t)
+	_, _ = b.Handle(ctx, "16175550123", "sell Bruins | Nov 14 | $40 | 2")
+
+	cases := map[string]func(l *domain.Listing) bool{
+		"edit 1 price $50":           func(l *domain.Listing) bool { return l.PriceCents == 5000 },
+		"edit #1 qty 3":              func(l *domain.Listing) bool { return l.Quantity == 3 },
+		"edit 1 date Nov 20":         func(l *domain.Listing) bool { return l.EventDate.Equal(date(2026, 11, 20)) },
+		"edit 1 venue TD Garden":     func(l *domain.Listing) bool { return l.Venue == "TD Garden" },
+		"edit 1 event Bruins vs NYR": func(l *domain.Listing) bool { return l.EventName == "Bruins vs NYR" },
+	}
+	for msg, ok := range cases {
+		reply, err := b.Handle(ctx, "16175550123", msg)
+		if err != nil || !strings.HasPrefix(reply, "Updated #1") || !ok(repo.rows[0]) {
+			t.Errorf("%q: reply %q, err %v, row %+v", msg, reply, err, repo.rows[0])
+		}
+	}
+
+	reply, _ := b.Handle(ctx, "16175550123", "edit 1 price")
+	if !strings.Contains(reply, "edit <number>") {
+		t.Errorf("usage: %s", reply)
+	}
+	reply, _ = b.Handle(ctx, "16175550123", "edit 1 date 2026-01-01")
+	if !strings.Contains(reply, "in the past") || !repo.rows[0].EventDate.Equal(date(2026, 11, 20)) {
+		t.Errorf("past date should be rejected: %s", reply)
+	}
+
+	_ = b.users.(*fakeUsers).Create(ctx, &domain.User{Email: "o@mit.edu", Name: "Other", WhatsAppPhone: "16175550999"})
+	reply, _ = b.Handle(ctx, "16175550999", "edit 1 price $1")
+	if repo.rows[0].PriceCents != 5000 || !strings.Contains(reply, "don't have") {
+		t.Errorf("other seller edited listing: %s", reply)
+	}
+}

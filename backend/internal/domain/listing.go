@@ -77,5 +77,7 @@ type ListingRepository interface {
 	Create(ctx context.Context, l *Listing) error
 	FindByID(ctx context.Context, id int64) (*Listing, error)
 	Search(ctx context.Context, f ListingFilter) ([]Listing, error)
+	// Update replaces the seller-editable fields of the listing with l.ID.
+	Update(ctx context.Context, l *Listing) error
 	SetStatus(ctx context.Context, id int64, s Status) error
 }

@@ -42,25 +42,9 @@ func NewListings(repo domain.ListingRepository) *Listings {
 
 // Create validates and stores a new active listing for the seller.
 func (l *Listings) Create(ctx context.Context, sellerID int64, src domain.Source, in ListingInput) (*domain.Listing, error) {
-	in.EventName = strings.TrimSpace(in.EventName)
-	in.Venue = strings.TrimSpace(in.Venue)
-	in.Notes = strings.TrimSpace(in.Notes)
-
-	switch {
-	case in.EventName == "" || len(in.EventName) > MaxEventNameLen:
-		return nil, fmt.Errorf("%w: event name is required and at most %d characters", ErrInvalidInput, MaxEventNameLen)
-	case in.EventDate.IsZero():
-		return nil, fmt.Errorf("%w: event date is required", ErrInvalidInput)
-	case in.EventDate.Before(l.today()):
-		return nil, fmt.Errorf("%w: event date is in the past", ErrInvalidInput)
-	case len(in.Venue) > MaxVenueLen:
-		return nil, fmt.Errorf("%w: venue is at most %d characters", ErrInvalidInput, MaxVenueLen)
-	case in.Quantity < 1 || in.Quantity > MaxQuantity:
-		return nil, fmt.Errorf("%w: quantity must be between 1 and %d", ErrInvalidInput, MaxQuantity)
-	case in.PriceCents < 0 || in.PriceCents > MaxPriceCents:
-		return nil, fmt.Errorf("%w: price must be between $0 and $%d", ErrInvalidInput, MaxPriceCents/100)
-	case len(in.Notes) > MaxNotesLen:
-		return nil, fmt.Errorf("%w: notes are at most %d characters", ErrInvalidInput, MaxNotesLen)
+	in, err := l.validate(in)
+	if err != nil {
+		return nil, err
 	}
 
 	listing := &domain.Listing{
@@ -79,6 +63,70 @@ func (l *Listings) Create(ctx context.Context, sellerID int64, src domain.Source
 	}
 	// Re-read so the seller fields are joined in.
 	return l.repo.FindByID(ctx, listing.ID)
+}
+
+// validate trims and checks the seller-provided fields.
+func (l *Listings) validate(in ListingInput) (ListingInput, error) {
+	in.EventName = strings.TrimSpace(in.EventName)
+	in.Venue = strings.TrimSpace(in.Venue)
+	in.Notes = strings.TrimSpace(in.Notes)
+
+	switch {
+	case in.EventName == "" || len(in.EventName) > MaxEventNameLen:
+		return in, fmt.Errorf("%w: event name is required and at most %d characters", ErrInvalidInput, MaxEventNameLen)
+	case in.EventDate.IsZero():
+		return in, fmt.Errorf("%w: event date is required", ErrInvalidInput)
+	case in.EventDate.Before(l.today()):
+		return in, fmt.Errorf("%w: event date is in the past", ErrInvalidInput)
+	case len(in.Venue) > MaxVenueLen:
+		return in, fmt.Errorf("%w: venue is at most %d characters", ErrInvalidInput, MaxVenueLen)
+	case in.Quantity < 1 || in.Quantity > MaxQuantity:
+		return in, fmt.Errorf("%w: quantity must be between 1 and %d", ErrInvalidInput, MaxQuantity)
+	case in.PriceCents < 0 || in.PriceCents > MaxPriceCents:
+		return in, fmt.Errorf("%w: price must be between $0 and $%d", ErrInvalidInput, MaxPriceCents/100)
+	case len(in.Notes) > MaxNotesLen:
+		return in, fmt.Errorf("%w: notes are at most %d characters", ErrInvalidInput, MaxNotesLen)
+	}
+	return in, nil
+}
+
+// Update replaces a seller's own listing's details. Status is left alone;
+// use SetStatus for that.
+func (l *Listings) Update(ctx context.Context, sellerID, listingID int64, in ListingInput) (*domain.Listing, error) {
+	in, err := l.validate(in)
+	if err != nil {
+		return nil, err
+	}
+	listing, err := l.repo.FindByID(ctx, listingID)
+	if err != nil {
+		return nil, err
+	}
+	if listing.SellerID != sellerID {
+		return nil, errors.Join(domain.ErrNotFound, domain.ErrForbidden)
+	}
+	listing.EventName = in.EventName
+	listing.EventDate = in.EventDate
+	listing.Venue = in.Venue
+	listing.Quantity = in.Quantity
+	listing.PriceCents = in.PriceCents
+	listing.Notes = in.Notes
+	if err := l.repo.Update(ctx, listing); err != nil {
+		return nil, err
+	}
+	return l.repo.FindByID(ctx, listingID)
+}
+
+// InputOf returns the editable fields of an existing listing, so a caller
+// can change one field and pass the rest through unchanged.
+func InputOf(l *domain.Listing) ListingInput {
+	return ListingInput{
+		EventName:  l.EventName,
+		EventDate:  l.EventDate,
+		Venue:      l.Venue,
+		Quantity:   l.Quantity,
+		PriceCents: l.PriceCents,
+		Notes:      l.Notes,
+	}
 }
 
 // Search returns active listings for upcoming events matching the filter.

@@ -146,6 +146,16 @@ func (f *fakeListings) Search(_ context.Context, flt domain.ListingFilter) ([]do
 	return out, nil
 }
 
+func (f *fakeListings) Update(_ context.Context, l *domain.Listing) error {
+	for _, r := range f.rows {
+		if r.ID == l.ID {
+			r.EventName, r.EventDate, r.Venue, r.Quantity, r.PriceCents, r.Notes = l.EventName, l.EventDate, l.Venue, l.Quantity, l.PriceCents, l.Notes
+			return nil
+		}
+	}
+	return domain.ErrNotFound
+}
+
 func (f *fakeListings) SetStatus(_ context.Context, id int64, s domain.Status) error {
 	for _, r := range f.rows {
 		if r.ID == id {

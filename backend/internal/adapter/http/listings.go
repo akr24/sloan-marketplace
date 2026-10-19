@@ -88,6 +88,34 @@ func (h listingsHandler) search(c echo.Context) error {
 	return c.JSON(http.StatusOK, list)
 }
 
+// update replaces every editable field; the client sends the full form.
+func (h listingsHandler) update(c echo.Context) error {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "not found")
+	}
+	var req createListingRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "malformed JSON")
+	}
+	date, err := time.Parse(time.DateOnly, req.EventDate)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "event_date must be YYYY-MM-DD")
+	}
+	l, err := h.listings.Update(c.Request().Context(), currentUserID(c), id, usecase.ListingInput{
+		EventName:  req.EventName,
+		EventDate:  date,
+		Venue:      req.Venue,
+		Quantity:   req.Quantity,
+		PriceCents: dollarsToCents(req.Price),
+		Notes:      req.Notes,
+	})
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, l)
+}
+
 func (h listingsHandler) get(c echo.Context) error {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {

@@ -46,6 +46,9 @@ export default function MyListingsPage() {
               <span className={`status ${l.status}`}>{l.status}</span>
               {l.status === 'active' ? (
                 <>
+                  <Link to={`/listings/${l.id}/edit`} className="share">
+                    Edit
+                  </Link>
                   <a className="share" href={groupShareLink(l, true)} target="_blank" rel="noreferrer">
                     Share
                   </a>
