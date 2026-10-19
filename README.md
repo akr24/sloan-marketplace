@@ -160,9 +160,15 @@ Price: $40
 Qty: 2
 ```
 
-`mine` lists your active listings, `edit 12 price $50` changes one field
-(event, date, price, qty, venue or notes), `sold 12` marks #12 sold,
-`remove 12` withdraws it, and anything else replies with help. Dates accept `Nov 14`,
+The bot replies with a preview; `yes` posts it, `edit price $50` (or date,
+qty, event, venue, notes) changes the draft, `cancel` drops it. `sell!` /
+`post!` skips the preview. Drafts wait 10 minutes.
+
+`mine` lists your active listings, `edit 12 price $50` changes one field of
+a posted listing, `sold 12` marks #12 sold, `remove 12` withdraws it, and
+anything else replies with help. In a direct chat, a posted listing's reply
+includes a "share to group" link that opens WhatsApp's chat picker with the
+post pre-written. Dates accept `Nov 14`,
 `11/14`, `2026-11-14`, `Sat Nov 14th`, `tomorrow` and similar.
 
 Try it locally without Meta (prices without `$` here, since make expands it):

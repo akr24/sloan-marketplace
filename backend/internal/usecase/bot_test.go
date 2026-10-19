@@ -102,7 +102,7 @@ func TestBotPostsAndClosesListing(t *testing.T) {
 	ctx := context.Background()
 	b, repo := newTestBot(t)
 
-	reply, err := b.Handle(ctx, "16175550123", "SELL Sloan Fall Ball | Nov 14 | $40 | 2")
+	reply, err := b.Handle(ctx, "16175550123", "SELL! Sloan Fall Ball | Nov 14 | $40 | 2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,17 +128,17 @@ func TestBotUnknownSenderAndBadInput(t *testing.T) {
 	ctx := context.Background()
 	b, repo := newTestBot(t)
 
-	reply, _ := b.Handle(ctx, "447911123456", "sell x | nov 1 | 5")
+	reply, _ := b.Handle(ctx, "447911123456", "sell! x | nov 1 | 5")
 	if !strings.Contains(reply, "isn't linked") || len(repo.rows) != 0 {
 		t.Errorf("unknown sender: %s", reply)
 	}
 
-	reply, _ = b.Handle(ctx, "16175550123", "sell Gala | yesterday-ish | $5")
+	reply, _ = b.Handle(ctx, "16175550123", "sell! Gala | yesterday-ish | $5")
 	if !strings.Contains(reply, "couldn't read") {
 		t.Errorf("bad date: %s", reply)
 	}
 
-	reply, _ = b.Handle(ctx, "16175550123", "sell Gala | 2026-10-01 | $5")
+	reply, _ = b.Handle(ctx, "16175550123", "sell! Gala | 2026-10-01 | $5")
 	if !strings.Contains(reply, "in the past") {
 		t.Errorf("past date: %s", reply)
 	}
@@ -153,7 +153,7 @@ func TestSellerCannotCloseOthersListing(t *testing.T) {
 	ctx := context.Background()
 	b, repo := newTestBot(t)
 	_ = b.users.(*fakeUsers).Create(ctx, &domain.User{Email: "o@mit.edu", Name: "Other", WhatsAppPhone: "16175550999"})
-	_, _ = b.Handle(ctx, "16175550123", "sell Gala | Nov 1 | 5")
+	_, _ = b.Handle(ctx, "16175550123", "sell! Gala | Nov 1 | 5")
 
 	reply, _ := b.Handle(ctx, "16175550999", "sold 1")
 	if repo.rows[0].Status != domain.StatusActive || !strings.Contains(reply, "don't have") {
@@ -169,7 +169,7 @@ func TestBotInGroup(t *testing.T) {
 		t.Fatal("bot answered ordinary group chatter")
 	}
 
-	reply, ok, err := b.HandleGroup(ctx, "16175550123", "/marketplace post BRUINS TICKETS 80 DOLLARS fri")
+	reply, ok, err := b.HandleGroup(ctx, "16175550123", "/marketplace post! BRUINS TICKETS 80 DOLLARS fri")
 	if err != nil || !ok {
 		t.Fatal(ok, err)
 	}
@@ -182,12 +182,12 @@ func TestBotInGroup(t *testing.T) {
 		t.Errorf("group commands should use the prefix: %s", reply)
 	}
 
-	reply, _, _ = b.HandleGroup(ctx, "447911123456", "/mp post Gala fri $5")
+	reply, _, _ = b.HandleGroup(ctx, "447911123456", "/mp post! Gala fri $5")
 	if strings.Contains(reply, "447911123456") || !strings.Contains(reply, "isn't linked") {
 		t.Errorf("group reply must not reveal the number: %s", reply)
 	}
 
-	reply, _, _ = b.HandleGroup(ctx, "", "/marketplace post Gala fri $5")
+	reply, _, _ = b.HandleGroup(ctx, "", "/marketplace post! Gala fri $5")
 	if !strings.Contains(reply, "direct message") {
 		t.Errorf("hidden sender: %s", reply)
 	}
@@ -195,7 +195,7 @@ func TestBotInGroup(t *testing.T) {
 
 func TestBotDirectFreeText(t *testing.T) {
 	b, repo := newTestBot(t)
-	reply, _ := b.Handle(context.Background(), "16175550123", "sell BRUINS TICKETS 80 DOLLARS fri")
+	reply, _ := b.Handle(context.Background(), "16175550123", "sell! BRUINS TICKETS 80 DOLLARS fri")
 	if len(repo.rows) != 1 || repo.rows[0].EventName != "Bruins Tickets" {
 		t.Errorf("free text DM: %s", reply)
 	}
@@ -204,7 +204,7 @@ func TestBotDirectFreeText(t *testing.T) {
 func TestBotEdit(t *testing.T) {
 	ctx := context.Background()
 	b, repo := newTestBot(t)
-	_, _ = b.Handle(ctx, "16175550123", "sell Bruins | Nov 14 | $40 | 2")
+	_, _ = b.Handle(ctx, "16175550123", "sell! Bruins | Nov 14 | $40 | 2")
 
 	cases := map[string]func(l *domain.Listing) bool{
 		"edit 1 price $50":           func(l *domain.Listing) bool { return l.PriceCents == 5000 },
@@ -233,5 +233,65 @@ func TestBotEdit(t *testing.T) {
 	reply, _ = b.Handle(ctx, "16175550999", "edit 1 price $1")
 	if repo.rows[0].PriceCents != 5000 || !strings.Contains(reply, "don't have") {
 		t.Errorf("other seller edited listing: %s", reply)
+	}
+}
+
+func TestBotPreviewThenConfirm(t *testing.T) {
+	ctx := context.Background()
+	b, repo := newTestBot(t)
+	me := "16175550123"
+
+	reply, _ := b.Handle(ctx, me, "sell Bruins tickets fri $80 x2")
+	if len(repo.rows) != 0 || !strings.Contains(reply, "Here's what I'll post") || !strings.Contains(reply, "• Price: $80 each") {
+		t.Fatalf("expected a preview, got %q (rows %d)", reply, len(repo.rows))
+	}
+
+	reply, _ = b.Handle(ctx, me, "edit price $70")
+	if len(repo.rows) != 0 || !strings.Contains(reply, "• Price: $70 each") {
+		t.Fatalf("draft edit: %q", reply)
+	}
+	reply, _ = b.Handle(ctx, me, "edit date 2026-01-01")
+	if !strings.Contains(reply, "in the past") {
+		t.Errorf("draft edit should validate: %q", reply)
+	}
+
+	reply, _ = b.Handle(ctx, me, "yes")
+	if len(repo.rows) != 1 || repo.rows[0].PriceCents != 7000 || repo.rows[0].Quantity != 2 || !strings.Contains(reply, "Posted #1") {
+		t.Fatalf("confirm: %q rows %+v", reply, repo.rows)
+	}
+	if !strings.Contains(reply, "https://wa.me/?text=") {
+		t.Errorf("direct-chat post should include a share link: %q", reply)
+	}
+
+	reply, _ = b.Handle(ctx, me, "yes")
+	if !strings.Contains(reply, "Nothing waiting") {
+		t.Errorf("second yes: %q", reply)
+	}
+
+	_, _ = b.Handle(ctx, me, "sell Gala sat $5")
+	reply, _ = b.Handle(ctx, me, "cancel")
+	if len(repo.rows) != 1 || !strings.Contains(reply, "Cancelled") {
+		t.Errorf("cancel: %q", reply)
+	}
+
+	// Drafts expire.
+	_, _ = b.Handle(ctx, me, "sell Gala sat $5")
+	b.now = func() time.Time { return testNow.Add(DraftTTL + time.Minute) }
+	reply, _ = b.Handle(ctx, me, "yes")
+	if !strings.Contains(reply, "Nothing waiting") {
+		t.Errorf("expired draft: %q", reply)
+	}
+}
+
+func TestBotGroupPreview(t *testing.T) {
+	ctx := context.Background()
+	b, repo := newTestBot(t)
+	reply, ok, _ := b.HandleGroup(ctx, "16175550123", "/marketplace post Bruins fri $80")
+	if !ok || !strings.Contains(reply, "Here's what I'll post") {
+		t.Fatalf("group preview: %q", reply)
+	}
+	reply, _, _ = b.HandleGroup(ctx, "16175550123", "/marketplace yes")
+	if len(repo.rows) != 1 || !strings.Contains(reply, "Listed #1") {
+		t.Errorf("group confirm: %q", reply)
 	}
 }
