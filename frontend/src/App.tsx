@@ -6,25 +6,33 @@ import AccountPage from './pages/AccountPage'
 import BrowsePage from './pages/BrowsePage'
 import EditListingPage from './pages/EditListingPage'
 import ListingPage from './pages/ListingPage'
-import MyListingsPage from './pages/MyListingsPage'
+import ListingLivePage from './pages/ListingLivePage'
+import NewListingPage from './pages/NewListingPage'
 import SellPage from './pages/SellPage'
 import SignInPage from './pages/SignInPage'
 
 // Phone-first: a bottom tab bar within thumb reach, like a native app.
+// Icons are simple strokes so they read as part of the wireframe style.
+const icon = (d: string) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d={d} />
+  </svg>
+)
+
 function TabBar() {
   return (
     <nav className="tabbar" aria-label="Main">
       <NavLink to="/" end>
-        <span aria-hidden>🎟️</span>Browse
+        {icon('M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4a2 2 0 0 0 0-4zM14 5v14')}
+        Browse
       </NavLink>
       <NavLink to="/sell">
-        <span aria-hidden>➕</span>Sell
-      </NavLink>
-      <NavLink to="/mine">
-        <span aria-hidden>📋</span>My listings
+        {icon('M12 5v14M5 12h14')}
+        Sell
       </NavLink>
       <NavLink to="/account">
-        <span aria-hidden>👤</span>Account
+        {icon('M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5')}
+        Account
       </NavLink>
     </nav>
   )
@@ -67,8 +75,11 @@ export default function App() {
           <Route path="/" element={<RequireAuth><BrowsePage /></RequireAuth>} />
           <Route path="/listings/:id" element={<RequireAuth><ListingPage /></RequireAuth>} />
           <Route path="/listings/:id/edit" element={<RequireAuth><EditListingPage /></RequireAuth>} />
+          <Route path="/listings/:id/live" element={<RequireAuth><ListingLivePage /></RequireAuth>} />
           <Route path="/sell" element={<RequireAuth><SellPage /></RequireAuth>} />
-          <Route path="/mine" element={<RequireAuth><MyListingsPage /></RequireAuth>} />
+          <Route path="/sell/new" element={<RequireAuth><NewListingPage /></RequireAuth>} />
+          {/* My listings now lives on the Sell tab; keep old links working. */}
+          <Route path="/mine" element={<Navigate to="/sell" replace />} />
           <Route path="/account" element={<RequireAuth><AccountPage /></RequireAuth>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

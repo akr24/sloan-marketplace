@@ -1,13 +1,26 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { listings, type Listing } from '../api/client'
-import { contactText, formatDate, formatPhone, formatPrice, groupShareLink, whatsappLink } from '../api/format'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { listings, type Listing, type ListingStatus } from '../api/client'
+import {
+  contactText,
+  firstName,
+  formatDate,
+  formatPrice,
+  groupShareLink,
+  initials,
+  shortName,
+  sourceLabel,
+  timeAgo,
+  whatsappLink,
+} from '../api/format'
 import { useAuth } from '../auth/context'
 
 export default function ListingPage() {
   const { id } = useParams()
   const { user } = useAuth()
-  const justPosted = useSearchParams()[0].has('posted')
+  const navigate = useNavigate()
+  // Opened straight from a shared link there's no page to go back to.
+  const canGoBack = useLocation().key !== 'default'
   const [listing, setListing] = useState<Listing | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -18,80 +31,120 @@ export default function ListingPage() {
       .catch((err: Error) => setError(err.message))
   }, [id])
 
-  if (error) return <p className="error">{error === 'not found' ? 'That listing no longer exists.' : error}</p>
+  async function setStatus(status: ListingStatus) {
+    if (!listing) return
+    try {
+      setListing(await listings.setStatus(listing.id, status))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update listing')
+    }
+  }
+
+  const back = (
+    <header className="page-head">
+      <button type="button" className="link" style={{ padding: 0, textDecoration: 'none' }} onClick={() => (canGoBack ? navigate(-1) : navigate('/'))}>
+        ‹ Back
+      </button>
+      {listing && (
+        <span className={`aside live-dot ${listing.status === 'active' ? '' : 'off'}`}>
+          {listing.status === 'active' ? 'Available' : listing.status === 'sold' ? 'Sold' : 'Removed'} · posted{' '}
+          {timeAgo(listing.created_at)}
+        </span>
+      )}
+    </header>
+  )
+
+  if (error) {
+    return (
+      <>
+        {back}
+        <p className="error">{error === 'not found' ? 'That listing no longer exists.' : error}</p>
+      </>
+    )
+  }
   if (!listing) return <p className="center muted">Loading…</p>
 
   const l = listing
   const isMine = user?.id === l.seller_id
+  const prefill = contactText(l)
 
   return (
-    <article className="detail">
-      <Link to="/" className="back">
-        ‹ All tickets
-      </Link>
-      {l.status !== 'active' && <p className="banner">This listing is {l.status}.</p>}
-      {justPosted && isMine && (
-        <p className="banner success">Posted! Share it to your Sloan WhatsApp groups so people see it.</p>
-      )}
-      <h1>{l.event_name}</h1>
-      <p className="muted">
-        {formatDate(l.event_date, { weekday: 'long', month: 'long', year: 'numeric' })}
-        {l.venue && ` · ${l.venue}`}
+    <article>
+      {back}
+      <h1 className="detail-title">{l.event_name}</h1>
+      <p className="detail-price">
+        {formatPrice(l.price_cents)} {l.price_cents > 0 && <span>per ticket · </span>}
+        <span>{l.quantity} available</span>
       </p>
 
-      <div className="facts card">
+      <dl className="facts">
         <div>
-          <span className="muted small">Price</span>
-          <strong>{formatPrice(l.price_cents)}</strong>
-          {l.price_cents > 0 && <span className="muted small">per ticket</span>}
+          <dt>Date</dt>
+          <dd>{formatDate(l.event_date)}</dd>
         </div>
         <div>
-          <span className="muted small">Available</span>
-          <strong>{l.quantity}</strong>
-          <span className="muted small">ticket{l.quantity === 1 ? '' : 's'}</span>
+          <dt>Tickets</dt>
+          <dd>{l.quantity}</dd>
+        </div>
+        <div>
+          <dt>Venue</dt>
+          <dd>{l.venue || '—'}</dd>
+        </div>
+        <div>
+          <dt>Posted</dt>
+          <dd>{sourceLabel(l).replace('via ', 'Via ')}</dd>
+        </div>
+      </dl>
+
+      {l.notes && (
+        <div className="inset quote">
+          <p>Note from {isMine ? 'you' : 'the seller'}</p>
+          <p>{l.notes}</p>
+        </div>
+      )}
+
+      <div className="box seller">
+        <span className="avatar" aria-hidden>
+          {initials(l.seller_name)}
+        </span>
+        <div>
+          <strong>{isMine ? 'You' : shortName(l.seller_name)}</strong>
+          <div className="meta">MIT email verified</div>
         </div>
       </div>
 
-      {l.notes && <p className="notes">{l.notes}</p>}
-
-      <p className="muted small">
-        Listed by {l.seller_name} {l.source === 'whatsapp' && 'via WhatsApp'} on{' '}
-        {new Date(l.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-      </p>
-
       {isMine ? (
-        <>
-          {l.status === 'active' && (
-            <a className="whatsapp block" href={groupShareLink(l, true)} target="_blank" rel="noreferrer">
-              Share to a WhatsApp group
-            </a>
+        <div className="sticky-cta">
+          {l.status === 'active' ? (
+            <>
+              <div className="owner-actions">
+                <Link to={`/listings/${l.id}/edit`} className="btn outline">
+                  Edit
+                </Link>
+                <button type="button" className="btn outline" onClick={() => setStatus('sold')}>
+                  Mark sold
+                </button>
+              </div>
+              <a className="btn primary" href={groupShareLink(l, true)} target="_blank" rel="noreferrer">
+                Share to a WhatsApp group
+              </a>
+            </>
+          ) : (
+            <button type="button" className="btn primary" onClick={() => setStatus('active')}>
+              Relist
+            </button>
           )}
-          <Link to={`/listings/${l.id}/edit`} className="button secondary block">
-            Edit listing
-          </Link>
-          <Link to="/mine" className="share">
-            Manage in My listings
-          </Link>
-        </>
+        </div>
       ) : (
         l.status === 'active' && (
-          <a
-            className="whatsapp block"
-            href={whatsappLink(l.seller_whatsapp, contactText(l))}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Message {l.seller_name.split(' ')[0]} on WhatsApp
-            <span className="small">{formatPhone(l.seller_whatsapp)}</span>
-          </a>
+          <div className="sticky-cta">
+            <a className="btn primary" href={whatsappLink(l.seller_whatsapp, prefill)} target="_blank" rel="noreferrer">
+              Message {firstName(l.seller_name)} on WhatsApp
+            </a>
+            <p className="mono">Prefilled: “{prefill}”</p>
+          </div>
         )
       )}
-      {!isMine && l.status === 'active' && (
-        <a className="share" href={groupShareLink(l, false)} target="_blank" rel="noreferrer">
-          Share to a group
-        </a>
-      )}
-      <p className="muted small center">Payment and handoff happen between you and the seller.</p>
     </article>
   )
 }

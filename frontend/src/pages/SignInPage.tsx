@@ -36,10 +36,14 @@ export default function SignInPage() {
     }
   }
 
+  // Most people type just their Kerberos name; a full address (say
+  // @sloan.mit.edu) is passed through as typed.
+  const fullEmail = email.includes('@') ? email.trim() : `${email.trim()}@mit.edu`
+
   const sendCode = (e: FormEvent) => {
     e.preventDefault()
     run(async () => {
-      await auth.requestCode(email)
+      await auth.requestCode(fullEmail)
       setCode('')
       setStep('code')
     })
@@ -47,14 +51,14 @@ export default function SignInPage() {
 
   const resend = () =>
     run(async () => {
-      await auth.requestCode(email)
+      await auth.requestCode(fullEmail)
       setNotice('New code sent.')
     })
 
   const verify = (e: FormEvent) => {
     e.preventDefault()
     run(async () => {
-      const res = await auth.verifyCode(email, code)
+      const res = await auth.verifyCode(fullEmail, code)
       if (res.session) {
         accept(res.session)
         navigate(from, { replace: true })
@@ -76,77 +80,88 @@ export default function SignInPage() {
 
   return (
     <div className="signin">
-      <div className="hero">
-        <div className="logo" aria-hidden>
-          🎟️
-        </div>
-        <h1>Sloan Marketplace</h1>
-        <p className="muted">Buy and sell event tickets with fellow Sloanies.</p>
+      <div className="logo" aria-hidden>
+        SM
       </div>
+      <h1>Sloan Marketplace</h1>
+      <p className="tagline">Every ticket Sloanies are selling, live in one place.</p>
 
-      {step === 'email' && (
-        <form onSubmit={sendCode} className="card">
+      {step !== 'profile' && (
+        <form onSubmit={sendCode}>
           <label>
             MIT email
-            <input
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              autoCapitalize="none"
-              placeholder="you@mit.edu"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+            <span className="suffixed">
+              <input
+                type="text"
+                inputMode="email"
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="kerberos"
+                required
+                readOnly={step === 'code'}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              {!email.includes('@') && <span>@mit.edu</span>}
+            </span>
           </label>
-          {error && <p className="error">{error}</p>}
-          <button type="submit" className="primary" disabled={busy}>
-            {busy ? 'Sending…' : 'Email me a code'}
-          </button>
-          <p className="muted small">New or returning, it's the same step. We only accept mit.edu addresses.</p>
+          {step === 'email' ? (
+            <>
+              {error && <p className="error">{error}</p>}
+              <button type="submit" className="btn primary" disabled={busy}>
+                {busy ? 'Sending…' : 'Send code'}
+              </button>
+            </>
+          ) : (
+            <button type="button" className="link" onClick={() => setStep('email')} style={{ alignSelf: 'flex-start' }}>
+              Use a different email
+            </button>
+          )}
         </form>
       )}
 
       {step === 'code' && (
-        <form onSubmit={verify} className="card">
-          <p>
-            We sent a 6-digit code to <strong>{email}</strong>.
-          </p>
+        <form onSubmit={verify} style={{ marginTop: '1rem' }}>
           <label>
-            Code
-            <input
-              className="code"
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="[0-9]{6}"
-              maxLength={6}
-              required
-              autoFocus
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-            />
+            6-digit code
+            <span className="code-boxes">
+              {Array.from({ length: 6 }, (_, i) => (
+                <span key={i} className={i === code.length ? 'cursor' : ''} aria-hidden>
+                  {code[i] ?? ''}
+                </span>
+              ))}
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                required
+                autoFocus
+                aria-label={`Code sent to ${fullEmail}`}
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              />
+            </span>
+            <span className="hint">Sent to {fullEmail}.</span>
           </label>
           {error && <p className="error">{error}</p>}
           {notice && <p className="notice">{notice}</p>}
-          <button type="submit" className="primary" disabled={busy || code.length !== 6}>
-            {busy ? 'Checking…' : 'Continue'}
+          <button type="submit" className="btn primary" disabled={busy || code.length !== 6}>
+            {busy ? 'Checking…' : 'Start browsing'}
           </button>
-          <div className="row between">
-            <button type="button" className="link" onClick={() => setStep('email')}>
-              Use a different email
-            </button>
-            <button type="button" className="link" onClick={resend} disabled={busy}>
-              Resend code
-            </button>
-          </div>
+          <button type="button" className="link" onClick={resend} disabled={busy} style={{ alignSelf: 'center' }}>
+            Resend code
+          </button>
         </form>
       )}
 
       {step === 'profile' && (
-        <form onSubmit={finish} className="card">
-          <p>
-            <strong>Email verified.</strong> Last step: how buyers will reach you.
+        <form onSubmit={finish}>
+          <p className="small">
+            <strong className="check">Email verified.</strong> Last step: how buyers reach you.
           </p>
           <label>
             Your name
@@ -163,17 +178,27 @@ export default function SignInPage() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
             />
-            <span className="muted small">
-              Include the country code. Buyers tap your listing to message you here, and it's how our WhatsApp bot
+            <span className="hint">
+              Include the country code. Buyers tap your listing to message you here, and it's how the WhatsApp bot
               knows it's you.
             </span>
           </label>
           {error && <p className="error">{error}</p>}
-          <button type="submit" className="primary" disabled={busy}>
+          <button type="submit" className="btn primary" disabled={busy}>
             {busy ? 'Creating account…' : 'Create account'}
           </button>
         </form>
       )}
+
+      <div className="dashed" style={{ marginTop: '2rem' }}>
+        <p>
+          <strong>Selling?</strong>
+        </p>
+        <p className="muted" style={{ margin: 0 }}>
+          Sign in once, then text the Sloan Marketplace bot on WhatsApp and your listing appears here.
+        </p>
+      </div>
+      <p className="footnote mono">Only mit.edu addresses can join. Payment and handoff happen between buyer and seller.</p>
     </div>
   )
 }

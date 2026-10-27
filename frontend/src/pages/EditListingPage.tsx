@@ -24,10 +24,12 @@ export default function EditListingPage() {
 
   return (
     <>
-      <Link to={`/listings/${listing.id}`} className="back">
-        ‹ Back to listing
-      </Link>
-      <h2>Edit listing</h2>
+      <header className="page-head">
+        <h1>Edit listing</h1>
+        <Link to={`/listings/${listing.id}`} className="aside">
+          ‹ Listing
+        </Link>
+      </header>
       <ListingForm
         initial={listing}
         submitLabel="Save changes"
