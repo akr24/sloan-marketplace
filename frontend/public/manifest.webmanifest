@@ -3,7 +3,7 @@
   "short_name": "Sloan Market",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#a31f34",
+  "background_color": "#0c0c0e",
+  "theme_color": "#0c0c0e",
   "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
 }

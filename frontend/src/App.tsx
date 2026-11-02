@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation } from 're
 import './App.css'
 import { AuthProvider } from './auth/AuthContext'
 import { useAuth } from './auth/context'
+import Icon from './components/Icon'
 import AccountPage from './pages/AccountPage'
 import BrowsePage from './pages/BrowsePage'
 import EditListingPage from './pages/EditListingPage'
@@ -10,21 +11,23 @@ import MyListingsPage from './pages/MyListingsPage'
 import SellPage from './pages/SellPage'
 import SignInPage from './pages/SignInPage'
 
-// Phone-first: a bottom tab bar within thumb reach, like a native app.
+// Phone-first: a floating tab bar within thumb reach, with Sell as the one
+// bright button.
 function TabBar() {
   return (
     <nav className="tabbar" aria-label="Main">
-      <NavLink to="/" end>
-        <span aria-hidden>🎟️</span>Browse
+      <NavLink to="/" end aria-label="Browse">
+        <Icon name="home" size={22} stroke={2} />
       </NavLink>
-      <NavLink to="/sell">
-        <span aria-hidden>➕</span>Sell
+      <NavLink to="/mine" aria-label="My listings">
+        <Icon name="ticket" size={22} stroke={2} />
       </NavLink>
-      <NavLink to="/mine">
-        <span aria-hidden>📋</span>My listings
+      <NavLink to="/account" aria-label="Account">
+        <Icon name="user" size={22} stroke={2} />
       </NavLink>
-      <NavLink to="/account">
-        <span aria-hidden>👤</span>Account
+      <NavLink to="/sell" className="tab-sell">
+        <Icon name="plus" size={18} stroke={2.6} />
+        Sell
       </NavLink>
     </nav>
   )

@@ -1,8 +1,19 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { listings, type Listing } from '../api/client'
-import { contactText, formatDate, formatPhone, formatPrice, groupShareLink, whatsappLink } from '../api/format'
+import {
+  contactText,
+  eventColor,
+  formatDate,
+  formatPhone,
+  formatPrice,
+  groupShareLink,
+  initials,
+  timeAgo,
+  whatsappLink,
+} from '../api/format'
 import { useAuth } from '../auth/context'
+import Icon from '../components/Icon'
 
 export default function ListingPage() {
   const { id } = useParams()
@@ -23,46 +34,76 @@ export default function ListingPage() {
 
   const l = listing
   const isMine = user?.id === l.seller_id
+  const active = l.status === 'active'
+  const color = eventColor(l.event_name)
+  const firstName = l.seller_name.split(' ')[0]
 
   return (
     <article className="detail">
-      <Link to="/" className="back">
-        ‹ All tickets
-      </Link>
-      {l.status !== 'active' && <p className="banner">This listing is {l.status}.</p>}
-      {justPosted && isMine && (
-        <p className="banner success">Posted! Share it to your Sloan WhatsApp groups so people see it.</p>
-      )}
-      <h1>{l.event_name}</h1>
-      <p className="muted">
-        {formatDate(l.event_date, { weekday: 'long', month: 'long', year: 'numeric' })}
-        {l.venue && ` · ${l.venue}`}
-      </p>
+      <section className="event-hero" style={{ background: color.bg, color: color.ink }}>
+        <div className="event-hero-top">
+          <Link to="/" className="round-btn dark" aria-label="All tickets">
+            <Icon name="back" />
+          </Link>
+          <span className="age-chip">● Listed {timeAgo(l.created_at)}</span>
+          {active ? (
+            <a
+              className="round-btn ghost"
+              href={groupShareLink(l, isMine)}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Share to a WhatsApp group"
+            >
+              <Icon name="share" />
+            </a>
+          ) : (
+            <span className="round-btn-spacer" />
+          )}
+        </div>
+        <p className="event-when">
+          {formatDate(l.event_date, { weekday: 'short', month: 'short', day: 'numeric' })}
+          {l.venue && ` · ${l.venue}`}
+        </p>
+        <h1>{l.event_name}</h1>
+        <div className="event-facts">
+          <div>
+            <strong>{formatPrice(l.price_cents)}</strong>
+            {l.price_cents > 0 && <span> /ticket</span>}
+          </div>
+          <div>
+            <strong>{l.quantity}</strong>
+            <span> {active ? 'left' : `ticket${l.quantity === 1 ? '' : 's'}`}</span>
+          </div>
+        </div>
+      </section>
 
-      <div className="facts card">
-        <div>
-          <span className="muted small">Price</span>
-          <strong>{formatPrice(l.price_cents)}</strong>
-          {l.price_cents > 0 && <span className="muted small">per ticket</span>}
+      {!active && <p className="banner">This listing is {l.status === 'withdrawn' ? 'no longer available' : 'sold'}.</p>}
+      {justPosted && isMine && (
+        <p className="banner success">
+          <Icon name="check" />
+          You're live. Share it to a Sloan WhatsApp group so more people see it.
+        </p>
+      )}
+
+      <div className="seller">
+        <div className="avatar" aria-hidden>
+          {initials(l.seller_name)}
         </div>
         <div>
-          <span className="muted small">Available</span>
-          <strong>{l.quantity}</strong>
-          <span className="muted small">ticket{l.quantity === 1 ? '' : 's'}</span>
+          <strong>{l.seller_name}</strong>
+          <p className="muted small">
+            mit.edu verified{l.source === 'whatsapp' && ' · posted via WhatsApp'}
+          </p>
         </div>
       </div>
 
       {l.notes && <p className="notes">{l.notes}</p>}
 
-      <p className="muted small">
-        Listed by {l.seller_name} {l.source === 'whatsapp' && 'via WhatsApp'} on{' '}
-        {new Date(l.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-      </p>
-
       {isMine ? (
-        <>
-          {l.status === 'active' && (
-            <a className="whatsapp block" href={groupShareLink(l, true)} target="_blank" rel="noreferrer">
+        <div className="cta">
+          {active && (
+            <a className="button primary block" href={groupShareLink(l, true)} target="_blank" rel="noreferrer">
+              <Icon name="share" />
               Share to a WhatsApp group
             </a>
           )}
@@ -72,26 +113,27 @@ export default function ListingPage() {
           <Link to="/mine" className="share">
             Manage in My listings
           </Link>
-        </>
+        </div>
       ) : (
-        l.status === 'active' && (
-          <a
-            className="whatsapp block"
-            href={whatsappLink(l.seller_whatsapp, contactText(l))}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Message {l.seller_name.split(' ')[0]} on WhatsApp
-            <span className="small">{formatPhone(l.seller_whatsapp)}</span>
-          </a>
+        active && (
+          <div className="cta">
+            <p className="muted small">We'll open WhatsApp with this message ready to send</p>
+            <p className="bubble">{contactText(l)}</p>
+            <a
+              className="button primary block big"
+              href={whatsappLink(l.seller_whatsapp, contactText(l))}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Icon name="chat" />
+              Message {firstName}
+            </a>
+            <p className="muted small center">
+              {formatPhone(l.seller_whatsapp)} · You pay the seller directly.
+            </p>
+          </div>
         )
       )}
-      {!isMine && l.status === 'active' && (
-        <a className="share" href={groupShareLink(l, false)} target="_blank" rel="noreferrer">
-          Share to a group
-        </a>
-      )}
-      <p className="muted small center">Payment and handoff happen between you and the seller.</p>
     </article>
   )
 }
