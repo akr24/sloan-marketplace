@@ -1,18 +1,17 @@
 import { Link } from 'react-router-dom'
 import type { Listing } from '../api/client'
-import { contactText, eventColor, formatDate, formatPrice, isFresh, timeAgo, whatsappLink } from '../api/format'
+import { contactText, formatDate, formatPrice, isFresh, timeAgo, whatsappLink } from '../api/format'
 import Icon from './Icon'
 
-// One row in the feed: a colored date tile, the event, price and age, and a
+// One row in the feed: a date tile, the event, price and age, and a
 // one-tap button to WhatsApp the seller.
 export default function ListingCard({ listing: l, mine = false }: { listing: Listing; mine?: boolean }) {
-  const color = eventColor(l.event_name)
   const active = l.status === 'active'
   const fresh = active && isFresh(l.created_at)
   return (
     <article className={`listing${fresh ? ' fresh' : ''}${active ? '' : ' inactive'}`}>
       <Link to={`/listings/${l.id}`} className="listing-main">
-        <div className="date-tile" style={{ background: color.bg, color: color.ink }} aria-hidden>
+        <div className="date-tile" aria-hidden>
           <span>{formatDate(l.event_date, { weekday: undefined, day: undefined })}</span>
           <strong>{formatDate(l.event_date, { weekday: undefined, month: undefined })}</strong>
         </div>
