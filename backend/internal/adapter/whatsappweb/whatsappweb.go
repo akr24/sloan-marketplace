@@ -112,7 +112,9 @@ func (l *Listener) Close() {
 func (l *Listener) onEvent(evt any) {
 	switch v := evt.(type) {
 	case *events.Connected:
-		log.Printf("whatsapp-web: connected as %s", l.client.Store.ID.User)
+		if id := l.client.Store.ID; id != nil {
+			log.Printf("whatsapp-web: connected as %s", id.User)
+		}
 	case *events.LoggedOut:
 		log.Printf("whatsapp-web: logged out by the phone (%v); run `make wa-link` to link again", v.Reason)
 	case *events.Message:

@@ -160,9 +160,7 @@ Price: $40
 Qty: 2
 ```
 
-The bot replies with a preview; `yes` posts it, `edit price $50` (or date,
-qty, event, venue, notes) changes the draft, `cancel` drops it. `sell!` /
-`post!` skips the preview. Drafts wait 10 minutes.
+The bot posts it straight away and replies once with the listing's link.
 
 `mine` lists your active listings, `edit 12 price $50` changes one field of
 a posted listing, `sold 12` marks #12 sold, `remove 12` withdraws it, and

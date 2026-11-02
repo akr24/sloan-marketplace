@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/stdlib"
+	"go.mau.fi/whatsmeow/types/events"
 
 	"github.com/akr24/sloan-marketplace/backend/internal/adapter/postgres"
 	"github.com/akr24/sloan-marketplace/backend/internal/adapter/whatsappweb"
@@ -46,14 +47,35 @@ func main() {
 		return
 	}
 
+	// After pairing, WhatsApp restarts the socket and the client logs in for
+	// the first time; disconnecting before that finishes gets the new device
+	// logged out again, so wait for it.
+	connected := make(chan struct{}, 1)
+	client.AddEventHandler(func(evt any) {
+		if _, ok := evt.(*events.Connected); ok {
+			select {
+			case connected <- struct{}{}:
+			default:
+			}
+		}
+	})
+
 	linkCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 	err = whatsappweb.Link(linkCtx, client, phone, func(code string) {
-		fmt.Printf("\n  Pairing code for +%s:  %s-%s\n\n", phone, code[:4], code[4:])
+		fmt.Printf("\n  Pairing code for +%s:  %s\n\n", phone, code)
 		fmt.Println("  On that phone: WhatsApp → Settings → Linked devices → Link a device →")
 		fmt.Println("  \"Link with phone number instead\", then enter the code. You have about 2 minutes.")
 		fmt.Println()
 	})
+	if err == nil {
+		select {
+		case <-connected:
+			time.Sleep(5 * time.Second) // let the first sync settle
+		case <-time.After(time.Minute):
+			err = fmt.Errorf("whatsapp-web: paired, but the first login never finished")
+		}
+	}
 	client.Disconnect()
 	if err != nil {
 		log.Fatal(err)

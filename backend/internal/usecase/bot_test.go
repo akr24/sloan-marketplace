@@ -236,62 +236,14 @@ func TestBotEdit(t *testing.T) {
 	}
 }
 
-func TestBotPreviewThenConfirm(t *testing.T) {
-	ctx := context.Background()
-	b, repo := newTestBot(t)
-	me := "16175550123"
-
-	reply, _ := b.Handle(ctx, me, "sell Bruins tickets fri $80 x2")
-	if len(repo.rows) != 0 || !strings.Contains(reply, "Here's what I'll post") || !strings.Contains(reply, "• Price: $80 each") {
-		t.Fatalf("expected a preview, got %q (rows %d)", reply, len(repo.rows))
-	}
-
-	reply, _ = b.Handle(ctx, me, "edit price $70")
-	if len(repo.rows) != 0 || !strings.Contains(reply, "• Price: $70 each") {
-		t.Fatalf("draft edit: %q", reply)
-	}
-	reply, _ = b.Handle(ctx, me, "edit date 2026-01-01")
-	if !strings.Contains(reply, "in the past") {
-		t.Errorf("draft edit should validate: %q", reply)
-	}
-
-	reply, _ = b.Handle(ctx, me, "yes")
-	if len(repo.rows) != 1 || repo.rows[0].PriceCents != 7000 || repo.rows[0].Quantity != 2 || !strings.Contains(reply, "Posted #1") {
-		t.Fatalf("confirm: %q rows %+v", reply, repo.rows)
-	}
-	if !strings.Contains(reply, "https://wa.me/?text=") {
-		t.Errorf("direct-chat post should include a share link: %q", reply)
-	}
-
-	reply, _ = b.Handle(ctx, me, "yes")
-	if !strings.Contains(reply, "Nothing waiting") {
-		t.Errorf("second yes: %q", reply)
-	}
-
-	_, _ = b.Handle(ctx, me, "sell Gala sat $5")
-	reply, _ = b.Handle(ctx, me, "cancel")
-	if len(repo.rows) != 1 || !strings.Contains(reply, "Cancelled") {
-		t.Errorf("cancel: %q", reply)
-	}
-
-	// Drafts expire.
-	_, _ = b.Handle(ctx, me, "sell Gala sat $5")
-	b.now = func() time.Time { return testNow.Add(DraftTTL + time.Minute) }
-	reply, _ = b.Handle(ctx, me, "yes")
-	if !strings.Contains(reply, "Nothing waiting") {
-		t.Errorf("expired draft: %q", reply)
-	}
-}
-
-func TestBotGroupPreview(t *testing.T) {
+func TestBotPostsWithoutPreview(t *testing.T) {
 	ctx := context.Background()
 	b, repo := newTestBot(t)
 	reply, ok, _ := b.HandleGroup(ctx, "16175550123", "/marketplace post Bruins fri $80")
-	if !ok || !strings.Contains(reply, "Here's what I'll post") {
-		t.Fatalf("group preview: %q", reply)
+	if !ok || len(repo.rows) != 1 || !strings.Contains(reply, "Listed #1") {
+		t.Fatalf("group post: %q", reply)
 	}
-	reply, _, _ = b.HandleGroup(ctx, "16175550123", "/marketplace yes")
-	if len(repo.rows) != 1 || !strings.Contains(reply, "Listed #1") {
-		t.Errorf("group confirm: %q", reply)
+	if _, ok, _ := b.HandleGroup(ctx, "16175550123", "yes"); ok {
+		t.Error("bare yes in a group should be ignored")
 	}
 }

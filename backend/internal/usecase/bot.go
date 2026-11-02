@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/akr24/sloan-marketplace/backend/internal/domain"
@@ -28,24 +27,10 @@ type Bot struct {
 	listings *Listings
 	appURL   string
 	now      func() time.Time
-
-	// drafts are parsed listings waiting for the seller's "yes", keyed by
-	// user id. In memory on purpose: a draft lost to a restart just means
-	// re-sending the message.
-	mu     sync.Mutex
-	drafts map[int64]draft
 }
-
-type draft struct {
-	in      ListingInput
-	created time.Time
-}
-
-// DraftTTL is how long a preview waits for yes / edit / cancel.
-const DraftTTL = 10 * time.Minute
 
 func NewBot(users domain.UserRepository, listings *Listings, appURL string) *Bot {
-	return &Bot{users: users, listings: listings, appURL: strings.TrimRight(appURL, "/"), now: time.Now, drafts: map[int64]draft{}}
+	return &Bot{users: users, listings: listings, appURL: strings.TrimRight(appURL, "/"), now: time.Now}
 }
 
 // GroupPrefix starts every bot command in a group chat; "/mp" is accepted
@@ -115,110 +100,28 @@ func (b *Bot) handle(ctx context.Context, fromPhone, text string, c chat) (strin
 	}
 
 	text = strings.TrimSpace(text)
-	cmd, rest, bang := splitCommand(text)
-	pending, hasDraft := b.draft(user.ID)
+	cmd, rest := splitCommand(text)
 	switch cmd {
 	case "sell", "post":
-		if rest == "" && hasDraft {
-			return b.confirm(ctx, user, pending, c)
-		}
-		return b.sell(ctx, user, rest, bang, c)
-	case "yes", "y", "confirm", "ok", "go":
-		if !hasDraft {
-			return fmt.Sprintf("Nothing waiting to post. Send \"%spost ...\" with your tickets first.", c.cmd), nil
-		}
-		return b.confirm(ctx, user, pending, c)
-	case "cancel", "no", "nevermind", "stop":
-		b.dropDraft(user.ID)
-		if !hasDraft {
-			return "Nothing to cancel.", nil
-		}
-		return "Cancelled, nothing was posted.", nil
+		return b.sell(ctx, user, rest, c)
 	case "mine", "my", "listings":
 		return b.mine(ctx, user, c)
 	case "sold", "remove", "delete", "withdraw":
 		return b.close(ctx, user, cmd, rest, c)
 	case "edit", "update", "change":
-		// "edit price $50" with a draft pending changes the draft;
-		// "edit 12 price $50" changes a posted listing.
-		if hasDraft && !startsWithNumber(rest) {
-			return b.editDraft(user, pending, rest, c)
-		}
 		return b.edit(ctx, user, rest, c)
 	default:
 		return b.help(user, c), nil
 	}
 }
 
-func (b *Bot) draft(userID int64) (draft, bool) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	d, ok := b.drafts[userID]
-	if ok && b.now().Sub(d.created) > DraftTTL {
-		delete(b.drafts, userID)
-		return draft{}, false
-	}
-	return d, ok
-}
-
-func (b *Bot) setDraft(userID int64, in ListingInput) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.drafts[userID] = draft{in: in, created: b.now()}
-}
-
-func (b *Bot) dropDraft(userID int64) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	delete(b.drafts, userID)
-}
-
-func startsWithNumber(s string) bool {
-	s = strings.TrimPrefix(strings.TrimSpace(s), "#")
-	return s != "" && s[0] >= '0' && s[0] <= '9'
-}
-
-// sell parses the message. Normally it stores a draft and shows a preview
-// to confirm, so the parser's guesses are checked before anything goes
-// live; "sell!" / "post!" skips the preview.
-func (b *Bot) sell(ctx context.Context, u *domain.User, body string, skipConfirm bool, c chat) (string, error) {
+// sell parses the message and posts the listing straight away.
+func (b *Bot) sell(ctx context.Context, u *domain.User, body string, c chat) (string, error) {
 	in, err := ParseSellMessage(body, b.now())
 	if err != nil {
 		return fmt.Sprintf("I couldn't read that listing: %v\n\n%s", err, sellExample(c)), nil
 	}
-	if skipConfirm {
-		return b.post(ctx, u, in, c)
-	}
-	in, verr := b.listings.validate(in)
-	if verr != nil {
-		return "I couldn't post that: " + strings.TrimPrefix(verr.Error(), ErrInvalidInput.Error()+": "), nil
-	}
-	b.setDraft(u.ID, in)
-	return fmt.Sprintf("Here's what I'll post:\n%s\n\nReply *yes* to post it, *edit price $50* (or date, qty, event, venue, notes) to change something, or *cancel*.",
-		previewOf(in)), nil
-}
-
-func (b *Bot) confirm(ctx context.Context, u *domain.User, d draft, c chat) (string, error) {
-	b.dropDraft(u.ID)
-	return b.post(ctx, u, d.in, c)
-}
-
-// editDraft changes one field of the pending draft and shows it again.
-func (b *Bot) editDraft(u *domain.User, d draft, rest string, c chat) (string, error) {
-	fields := strings.Fields(rest)
-	if len(fields) < 2 {
-		return "Tell me what to change, e.g. *edit price $50* or *edit qty 3*.", nil
-	}
-	in, msg := applyField(d.in, fields[0], strings.TrimSpace(rest[len(fields[0]):]), b.now())
-	if msg != "" {
-		return msg, nil
-	}
-	in, err := b.listings.validate(in)
-	if err != nil {
-		return "I couldn't change that: " + strings.TrimPrefix(err.Error(), ErrInvalidInput.Error()+": "), nil
-	}
-	b.setDraft(u.ID, in)
-	return fmt.Sprintf("Updated:\n%s\n\nReply *yes* to post, *edit ...* to change more, or *cancel*.", previewOf(in)), nil
+	return b.post(ctx, u, in, c)
 }
 
 func (b *Bot) post(ctx context.Context, u *domain.User, in ListingInput, c chat) (string, error) {
@@ -244,18 +147,6 @@ func (b *Bot) shareLink(l *domain.Listing, link string) string {
 		l.EventName, l.EventDate.Format("Mon Jan 2"), venueSuffix(l.Venue),
 		l.Quantity, plural(l.Quantity), formatPrice(l.PriceCents), eachSuffix(l.PriceCents), link)
 	return "https://wa.me/?text=" + url.QueryEscape(text)
-}
-
-func previewOf(in ListingInput) string {
-	s := fmt.Sprintf("• Event: %s\n• Date: %s\n• Price: %s%s\n• Tickets: %d",
-		in.EventName, in.EventDate.Format("Mon Jan 2 2006"), formatPrice(in.PriceCents), eachSuffix(in.PriceCents), in.Quantity)
-	if in.Venue != "" {
-		s += "\n• Venue: " + in.Venue
-	}
-	if in.Notes != "" {
-		s += "\n• Notes: " + in.Notes
-	}
-	return s
 }
 
 func summaryOf(l *domain.Listing) string {
@@ -417,9 +308,7 @@ func sellExample(c chat) string {
 %[1]s Bruins tickets Sat 10/10 $80 each, 2 tickets
 
 Or use fields:
-%[1]s Bruins vs Rangers | Oct 10 | $80 | 2 | TD Garden | notes
-
-I'll show a preview; reply yes to post it. (%[1]s! skips the preview.)`, post)
+%[1]s Bruins vs Rangers | Oct 10 | $80 | 2 | TD Garden | notes`, post)
 }
 
 // ParseSellMessage reads a listing from the text after "sell". It accepts
@@ -635,18 +524,17 @@ func formatPrice(cents int) string {
 	return fmt.Sprintf("$%d.%02d", cents/100, cents%100)
 }
 
-// splitCommand separates the first word from the rest. bang reports a
-// trailing "!" on the command ("post!"), which skips the confirmation step.
-func splitCommand(text string) (cmd, rest string, bang bool) {
+// splitCommand separates the first word from the rest. A trailing "!" on
+// the command ("post!") is ignored.
+func splitCommand(text string) (cmd, rest string) {
 	fields := strings.Fields(text)
 	if len(fields) == 0 {
-		return "", "", false
+		return "", ""
 	}
-	bang = strings.HasSuffix(fields[0], "!")
 	cmd = strings.ToLower(strings.Trim(fields[0], "!/.:"))
 	rest = strings.TrimSpace(text[strings.Index(text, fields[0])+len(fields[0]):])
 	rest = strings.TrimPrefix(rest, ":")
-	return cmd, rest, bang
+	return cmd, rest
 }
 
 func firstName(name string) string {
