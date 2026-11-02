@@ -76,16 +76,36 @@ export default function SignInPage() {
 
   return (
     <div className="signin">
-      <div className="hero">
-        <div className="logo" aria-hidden>
-          🎟️
+      <div className="signin-art" aria-hidden>
+        <div className="art-card a">
+          <span>SAT · 7:30</span>
+          <strong>Celtics</strong>
         </div>
-        <h1>Sloan Marketplace</h1>
-        <p className="muted">Buy and sell event tickets with fellow Sloanies.</p>
+        <div className="art-card b">
+          <span>FRI · 8:00</span>
+          <strong>Fall Ball</strong>
+        </div>
+        <div className="art-card c">
+          <span>THU · 7:00</span>
+          <strong>Follies</strong>
+        </div>
+      </div>
+
+      <div className="hero">
+        <span className="wordmark">
+          <span className="dot" aria-hidden />
+          Sloan Marketplace
+        </span>
+        <h1>
+          Spare tickets,
+          <br />
+          <span className="accent">from your class.</span>
+        </h1>
+        <p className="muted">Buy and sell event tickets with fellow Sloanies. Message the seller, pay them directly.</p>
       </div>
 
       {step === 'email' && (
-        <form onSubmit={sendCode} className="card">
+        <form onSubmit={sendCode} className="auth-form">
           <label>
             MIT email
             <input
@@ -101,14 +121,14 @@ export default function SignInPage() {
           </label>
           {error && <p className="error">{error}</p>}
           <button type="submit" className="primary" disabled={busy}>
-            {busy ? 'Sending…' : 'Email me a code'}
+            {busy ? 'Sending…' : 'Send me a code'}
           </button>
           <p className="muted small">New or returning, it's the same step. We only accept mit.edu addresses.</p>
         </form>
       )}
 
       {step === 'code' && (
-        <form onSubmit={verify} className="card">
+        <form onSubmit={verify} className="auth-form">
           <p>
             We sent a 6-digit code to <strong>{email}</strong>.
           </p>
@@ -130,7 +150,7 @@ export default function SignInPage() {
           {error && <p className="error">{error}</p>}
           {notice && <p className="notice">{notice}</p>}
           <button type="submit" className="primary" disabled={busy || code.length !== 6}>
-            {busy ? 'Checking…' : 'Continue'}
+            {busy ? 'Checking…' : 'Let me in'}
           </button>
           <div className="row between">
             <button type="button" className="link" onClick={() => setStep('email')}>
@@ -144,7 +164,7 @@ export default function SignInPage() {
       )}
 
       {step === 'profile' && (
-        <form onSubmit={finish} className="card">
+        <form onSubmit={finish} className="auth-form">
           <p>
             <strong>Email verified.</strong> Last step: how buyers will reach you.
           </p>

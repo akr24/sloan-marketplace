@@ -27,9 +27,12 @@ export default function MyListingsPage() {
   if (error) return <p className="error">{error}</p>
   if (!items) return <p className="center muted">Loading…</p>
 
+  const live = items.filter((l) => l.status === 'active')
+  const done = items.filter((l) => l.status !== 'active')
+
   return (
     <>
-      <h2>My listings</h2>
+      <h2>Your tickets</h2>
       {items.length === 0 && (
         <div className="empty">
           <p>You haven't listed anything yet.</p>
@@ -38,36 +41,48 @@ export default function MyListingsPage() {
           </Link>
         </div>
       )}
+
+      {live.length > 0 && <p className="group-label">Live · {live.length}</p>}
       <div className="list">
-        {items.map((l) => (
-          <div key={l.id} className={l.status === 'active' ? '' : 'faded'}>
+        {live.map((l) => (
+          <div key={l.id} className="mine-card">
             <ListingCard listing={l} mine />
-            <div className="actions">
-              <span className={`status ${l.status}`}>{l.status}</span>
-              {l.status === 'active' ? (
-                <>
-                  <Link to={`/listings/${l.id}/edit`} className="share">
-                    Edit
-                  </Link>
-                  <a className="share" href={groupShareLink(l, true)} target="_blank" rel="noreferrer">
-                    Share
-                  </a>
-                  <button type="button" className="secondary" onClick={() => setStatus(l.id, 'sold')}>
-                    Mark sold
-                  </button>
-                  <button type="button" className="link" onClick={() => setStatus(l.id, 'withdrawn')}>
-                    Remove
-                  </button>
-                </>
-              ) : (
-                <button type="button" className="link" onClick={() => setStatus(l.id, 'active')}>
-                  Relist
-                </button>
-              )}
+            <div className="mine-actions">
+              <button type="button" className="primary" onClick={() => setStatus(l.id, 'sold')}>
+                Mark sold
+              </button>
+              <Link to={`/listings/${l.id}/edit`} className="button outline">
+                Edit
+              </Link>
+              <a className="button outline" href={groupShareLink(l, true)} target="_blank" rel="noreferrer">
+                Share
+              </a>
             </div>
+            <button type="button" className="link small" onClick={() => setStatus(l.id, 'withdrawn')}>
+              Remove listing
+            </button>
           </div>
         ))}
       </div>
+
+      {done.length > 0 && <p className="group-label">Sold &amp; removed · {done.length}</p>}
+      <div className="list">
+        {done.map((l) => (
+          <div key={l.id} className="done-row">
+            <ListingCard listing={l} mine />
+            <button type="button" className="link small" onClick={() => setStatus(l.id, 'active')}>
+              Relist
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {items.length > 0 && (
+        <p className="tip muted small">
+          You can also manage listings from WhatsApp: send <code>mine</code> to the bot to see them, and{' '}
+          <code>sold</code> with a listing number to close one.
+        </p>
+      )}
     </>
   )
 }
