@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -43,7 +44,7 @@ type Deps struct {
 	Bot        *usecase.Bot
 	Tokens     *token.Issuer
 	WhatsApp   WhatsAppConfig
-	CORSOrigin string
+	CORSOrigin string // one origin, or several separated by commas
 	// DevTools enables POST /api/dev/whatsapp, a bot simulator that skips
 	// Meta entirely. Never enable it in production.
 	DevTools bool
@@ -61,7 +62,7 @@ func New(d Deps) *echo.Echo {
 	e.Use(middleware.Logger())
 	e.Use(middleware.BodyLimit("64K"))
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{d.CORSOrigin},
+		AllowOrigins: corsOrigins(d.CORSOrigin),
 		AllowMethods: []string{echo.GET, echo.POST, echo.PUT, echo.PATCH, echo.DELETE, echo.OPTIONS},
 		AllowHeaders: []string{echo.HeaderContentType, echo.HeaderAuthorization},
 	}))
@@ -148,4 +149,16 @@ func trimInvalid(err error) string {
 		return msg[len(prefix):]
 	}
 	return msg
+}
+
+// corsOrigins splits a comma-separated CORS_ORIGIN, so a preview deployment
+// can share the production API.
+func corsOrigins(s string) []string {
+	var out []string
+	for _, o := range strings.Split(s, ",") {
+		if o = strings.TrimSpace(o); o != "" {
+			out = append(out, o)
+		}
+	}
+	return out
 }
