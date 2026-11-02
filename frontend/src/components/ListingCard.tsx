@@ -1,34 +1,47 @@
 import { Link } from 'react-router-dom'
 import type { Listing } from '../api/client'
-import { contactText, formatDate, formatPrice, whatsappLink } from '../api/format'
+import {
+  contactText,
+  formatDate,
+  formatPrice,
+  isNew,
+  shortName,
+  sourceLabel,
+  ticketCount,
+  timeAgo,
+  whatsappLink,
+} from '../api/format'
+import { useAuth } from '../auth/context'
 
-export default function ListingCard({ listing: l, mine = false }: { listing: Listing; mine?: boolean }) {
+// One compact row in the feed: event and price, date · count · seller, then
+// a mono meta line, with a Chat button straight to the seller's WhatsApp.
+export default function ListingCard({ listing: l }: { listing: Listing }) {
+  const { user } = useAuth()
+  const mine = user?.id === l.seller_id
+
   return (
-    <article className="listing">
-      <Link to={`/listings/${l.id}`} className="listing-main">
-        <div className="date-badge" aria-hidden>
-          <span>{formatDate(l.event_date, { weekday: undefined, day: undefined })}</span>
-          <strong>{formatDate(l.event_date, { weekday: undefined, month: undefined })}</strong>
+    <article className="feed-row">
+      <Link to={`/listings/${l.id}`}>
+        <div className="title">
+          <span>{l.event_name}</span>
+          <span>{formatPrice(l.price_cents)}</span>
         </div>
-        <div className="listing-body">
-          <h3>{l.event_name}</h3>
-          <p className="muted small">
-            {formatDate(l.event_date)}
-            {l.venue && ` · ${l.venue}`}
-          </p>
-          <p className="price">
-            {formatPrice(l.price_cents)}
-            {l.price_cents > 0 && <span className="muted small"> each</span>}
-            <span className="qty">
-              {l.quantity} ticket{l.quantity === 1 ? '' : 's'}
-            </span>
-          </p>
-          {!mine && <p className="muted small">Sold by {l.seller_name}</p>}
-        </div>
+        <p className="sub">
+          {formatDate(l.event_date)} · {ticketCount(l.quantity)} · {mine ? 'You' : shortName(l.seller_name)}
+        </p>
+        <p className="meta">
+          {isNew(l.created_at) && 'NEW · '}
+          {timeAgo(l.created_at)} · {sourceLabel(l)}
+          {l.venue && ` · ${l.venue}`}
+        </p>
       </Link>
-      {!mine && (
-        <a className="whatsapp" href={whatsappLink(l.seller_whatsapp, contactText(l))} target="_blank" rel="noreferrer">
-          Message on WhatsApp
+      {mine ? (
+        <Link to={`/listings/${l.id}/edit`} className="pill">
+          Edit
+        </Link>
+      ) : (
+        <a className="pill" href={whatsappLink(l.seller_whatsapp, contactText(l))} target="_blank" rel="noreferrer">
+          Chat
         </a>
       )}
     </article>

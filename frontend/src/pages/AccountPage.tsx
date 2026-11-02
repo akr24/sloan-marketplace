@@ -8,40 +8,54 @@ export default function AccountPage() {
   if (!user) return null
 
   return (
-    <>
-      <h2>Account</h2>
-      <div className="card">
-        <p>
-          <strong>{user.name}</strong>
-        </p>
-        <p className="muted">{user.email}</p>
-        <p className="muted">WhatsApp {formatPhone(user.whatsapp_phone)}</p>
-      </div>
+    <div className="account">
+      <header className="page-head">
+        <h1>Account</h1>
+      </header>
 
-      <h3>Post from WhatsApp</h3>
-      <div className="card bot-help">
-        <p>
-          Message our bot from <strong>{formatPhone(user.whatsapp_phone)}</strong> and it posts the listing for you.
-          Send:
+      <dl>
+        <dt>Name</dt>
+        <dd>{user.name}</dd>
+        <dt>MIT email</dt>
+        <dd>
+          {user.email} <span className="check muted small">verified</span>
+        </dd>
+        <dt>WhatsApp</dt>
+        <dd>{formatPhone(user.whatsapp_phone)}</dd>
+      </dl>
+
+      <section className="section" style={{ marginTop: '1rem', borderTop: '1px solid var(--border)' }}>
+        <h3>Bot commands</h3>
+        <p className="small muted">
+          Message the bot from {formatPhone(user.whatsapp_phone)}. In a Sloan group, start with <code>/mp</code>.
         </p>
-        <pre>sell Sloan Fall Ball | Nov 14 | $40 | 2</pre>
-        <p className="muted small">
-          That's event | date | price each | number of tickets, optionally followed by | venue | notes. Send{' '}
-          <code>help</code> for the long form, <code>mine</code> to see your listings, and <code>sold 12</code> to close
-          one.
-        </p>
-        {BOT_NUMBER ? (
-          <a className="whatsapp block" href={whatsappLink(BOT_NUMBER, 'help')} target="_blank" rel="noreferrer">
+        <div className="inset mono" style={{ lineHeight: 1.7 }}>
+          sell 2 Follies tix, $20 each, Nov 13
+          <br />
+          mine
+          <br />
+          edit 12 price $25
+          <br />
+          sold 12
+          <br />
+          help
+        </div>
+        {BOT_NUMBER && (
+          <a
+            className="btn outline"
+            style={{ marginTop: '0.75rem' }}
+            href={whatsappLink(BOT_NUMBER, 'help')}
+            target="_blank"
+            rel="noreferrer"
+          >
             Open the bot in WhatsApp
           </a>
-        ) : (
-          <p className="muted small">The bot's number will appear here once it's set up.</p>
         )}
-      </div>
+      </section>
 
-      <button type="button" className="secondary block" onClick={logout}>
+      <button type="button" className="btn outline" style={{ marginTop: '1.5rem' }} onClick={logout}>
         Sign out
       </button>
-    </>
+    </div>
   )
 }

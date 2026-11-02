@@ -59,3 +59,41 @@ export function groupShareLink(l: Listing, mine: boolean) {
   ]
   return `https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`
 }
+
+// "Maria Longoria" → "Maria L.", as the feed shows sellers.
+export function shortName(name: string) {
+  const parts = name.trim().split(/\s+/)
+  return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0]
+}
+
+export function initials(name: string) {
+  const parts = name.trim().split(/\s+/)
+  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase()
+}
+
+export function firstName(name: string) {
+  return name.split(' ')[0]
+}
+
+// "just now", "4 min ago", "3h ago", "2d ago".
+export function timeAgo(iso: string, now = Date.now()) {
+  const mins = Math.floor((now - new Date(iso).getTime()) / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins} min ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
+export function sourceLabel(l: Listing) {
+  return l.source === 'whatsapp' ? 'via bot' : 'via app'
+}
+
+export function ticketCount(n: number) {
+  return `${n} ticket${n === 1 ? '' : 's'}`
+}
+
+// Posted within the last hour.
+export function isNew(iso: string) {
+  return Date.now() - new Date(iso).getTime() < 60 * 60 * 1000
+}
